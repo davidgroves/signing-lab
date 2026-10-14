@@ -1,0 +1,50 @@
+name: Deploy report to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - REPORT.md
+      - REPORT.html
+      - COMMON/scripts/make-report-html.py
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build REPORT.html
+        run: python3 COMMON/scripts/make-report-html.py
+
+      - name: Stage site
+        run: |
+          mkdir -p _site
+          cp REPORT.html _site/index.html
+          cp REPORT.html _site/REPORT.html
+          cp REPORT.md _site/REPORT.md
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

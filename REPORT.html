@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BIND bump-in-the-wire signer: mid-sign transfers</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0d1117;
+    --ink: #e6edf3;
+    --muted: #9aa7b5;
+    --card: #161b22;
+    --line: #30363d;
+    --accent: #58a6ff;
+    --warn: #d29922;
+    --bad: #f85149;
+    --ok: #3fb950;
+    --code-bg: #010409;
+    --code-ink: #e6edf3;
+    --code-inline: #21262d;
+    --th: #21262d;
+    --quote-bg: #2a1f0a;
+    --quote-ink: #e3b341;
+    --ok-bg: #0d2818;
+    --ok-border: #238636;
+    --bad-bg: #2d1214;
+    --bad-border: #da3633;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font: 17px/1.55 "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 80% 50% at 10% 0%, #12203a 0%, transparent 55%),
+      radial-gradient(ellipse 60% 40% at 90% 10%, #0f2a24 0%, transparent 50%),
+      var(--bg);
+  }
+  .wrap { max-width: 54rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  header.hero {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  h1 {
+    font-size: clamp(1.6rem, 3.5vw, 2.15rem);
+    line-height: 1.2;
+    margin: 0 0 1rem;
+    letter-spacing: -0.02em;
+    color: #f0f6fc;
+  }
+  .meta { display: grid; gap: 0.35rem; color: var(--muted); font-size: 0.95rem; }
+  .meta a { color: var(--accent); }
+  h2 {
+    font-size: 1.35rem;
+    margin: 2.4rem 0 0.85rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--line);
+    color: #f0f6fc;
+  }
+  h3 { font-size: 1.1rem; margin: 1.5rem 0 0.6rem; color: #e6edf3; }
+  h4 { font-size: 1rem; margin: 1.2rem 0 0.5rem; color: #e6edf3; }
+  p, li { max-width: 70ch; }
+  blockquote {
+    margin: 1rem 0;
+    padding: 0.85rem 1.1rem;
+    border-left: 4px solid var(--warn);
+    background: var(--quote-bg);
+    color: var(--quote-ink);
+  }
+  blockquote p { margin: 0; }
+  a { color: var(--accent); }
+  code, pre {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.86em;
+  }
+  code {
+    background: var(--code-inline);
+    color: #ffa657;
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    line-height: 1.45;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin: 1rem 0 1.4rem;
+    background: var(--card);
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 0.45rem 0.55rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--th); color: #f0f6fc; }
+  td strong { color: var(--bad); }
+  .fig {
+    margin: 1.4rem 0 1.8rem;
+    padding: 1rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .fig svg { display: block; width: 100%; height: auto; max-width: 100%; }
+  .fig figcaption {
+    margin-top: 0.75rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+    max-width: none;
+  }
+  .callout {
+    margin: 1rem 0;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+  }
+  .callout.ok { border-color: var(--ok-border); background: var(--ok-bg); color: #7ee787; }
+  .callout.bad { border-color: var(--bad-border); background: var(--bad-bg); color: #ff7b72; }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin: 1.5rem 0;
+  }
+  .toc strong { display: block; margin-bottom: 0.4rem; color: #f0f6fc; }
+  .toc ol { margin: 0; padding-left: 1.3rem; }
+  .toc a { text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .badge {
+    display: inline-block;
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+  }
+  .badge.ok { color: var(--ok); background: var(--ok-bg); border: 1px solid var(--ok-border); }
+  .badge.bad { color: var(--bad); background: var(--bad-bg); border: 1px solid var(--bad-border); }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  @media print {
+    :root {
+      color-scheme: light;
+      --bg: #fff; --ink: #111; --muted: #444; --card: #fff; --line: #ccc;
+      --accent: #06c; --code-bg: #f4f4f4; --code-ink: #111; --code-inline: #eee; --th: #f0f0f0;
+    }
+    body { background: #fff; color: #111; }
+    .fig { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <h1>BIND bump-in-the-wire signer: mid-sign transfers</h1>
+  <div class="meta"><div><strong>Date:</strong> 2026-10-14</div><div><strong>Lab:</strong> this repository (<code>UNSIGNED PRIMARY → SIGNER → DISTRIBUTION</code>)</div><div><strong>BIND under test:</strong> <code>9.20.29</code> (<code>named -V</code> id <code>c3d4465</code>)</div><div><strong>BIND source:</strong> <a href="https://gitlab.isc.org/isc-projects/bind9">isc-projects/bind9</a> tag <code>v9.20.29</code> / commit <code>c3d4465</code></div><div><strong>Knot under test:</strong> <code>3.6.1</code> (<code>knotc</code> in lab containers; image <code>cznic/knot</code> via <code>KNOT_TAG=latest</code>)</div><div><strong>Knot source referenced below:</strong> Knot DNS <code>v3.4.6</code> <code>src/knot/events/handlers/refresh.c</code> (sign-then-commit model; behaviour confirmed empirically on 3.6.1)</div><div><strong>Battery matrix:</strong> <a href="RESULTS.html"><code>RESULTS.html</code></a></div></div>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#executive-summary">Executive summary</a></li><li><a href="#topology-under-test">Topology under test</a></li><li><a href="#definitive-results">Definitive results</a></li><li><a href="#how-the-fail-is-produced-timelines">How the FAIL is produced (timelines)</a></li><li><a href="#the-operational-surprise">The operational surprise</a></li><li><a href="#bind-code-trace-intentional-behaviour">BIND code trace (intentional behaviour)</a></li><li><a href="#knot-dns-comparison">Knot DNS comparison</a></li><li><a href="#is-this-a-bind-bug">Is this a BIND bug?</a></li><li><a href="#bind-9-21-development-series">BIND 9.21 development series</a></li><li><a href="#evidence-checklist">Evidence checklist</a></li><li><a href="#references">References</a></li>
+  </ol>
+</nav>
+
+<h2 id="executive-summary">Executive summary</h2>
+
+<figure class="fig" aria-labelledby="fig-contrast-cap">
+<svg viewBox="0 0 760 280" role="img" aria-label="BIND publishes partial signatures per quantum; Knot signs then commits once">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#8b949e"/>
+    </marker>
+  </defs>
+  <rect x="20" y="20" width="340" height="240" rx="8" fill="#152238" stroke="#388bfd"/>
+  <text x="40" y="48" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#58a6ff">BIND inline-signing</text>
+  <text x="40" y="70" font-family="monospace" font-size="11" fill="#8b949e">zone_sign() quantum loop</text>
+  <rect x="50" y="95" width="70" height="36" rx="4" fill="#1d4ed8"/><text x="85" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">Q1</text>
+  <rect x="140" y="95" width="70" height="36" rx="4" fill="#2563eb"/><text x="175" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">Q2</text>
+  <rect x="230" y="95" width="70" height="36" rx="4" fill="#3b82f6"/><text x="265" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">Q3…</text>
+  <path d="M85 131 v28" stroke="#f85149" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M175 131 v28" stroke="#f85149" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M265 131 v28" stroke="#f85149" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="40" y="185" font-family="Georgia, serif" font-size="13" fill="#f85149">commit + NEEDNOTIFY</text>
+  <text x="40" y="205" font-family="Georgia, serif" font-size="13" fill="#f85149">per quantum → half-signed AXFR</text>
+  <rect x="50" y="220" width="270" height="24" rx="3" fill="#3d1517" stroke="#f85149"/>
+  <text x="185" y="236" text-anchor="middle" font-family="monospace" font-size="11" fill="#ff7b72">lab: 24× PARTLY_SIGNED FAIL</text>
+  <rect x="400" y="20" width="340" height="240" rx="8" fill="#12261f" stroke="#3fb950"/>
+  <text x="420" y="48" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#3fb950">Knot on-secondary</text>
+  <text x="420" y="70" font-family="monospace" font-size="11" fill="#8b949e">refresh finalize</text>
+  <rect x="430" y="95" width="100" height="36" rx="4" fill="#8b949e"/><text x="480" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">inbound XFR</text>
+  <path d="M530 113 H560" stroke="#5a6570" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="560" y="95" width="140" height="36" rx="4" fill="#0f766e"/><text x="630" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">sign entire update</text>
+  <path d="M630 131 v28" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="545" y="165" width="170" height="36" rx="4" fill="#059669"/><text x="630" y="187" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">zone_update_commit</text>
+  <text x="420" y="225" font-family="Georgia, serif" font-size="13" fill="#3fb950">NOTIFY only after commit</text>
+  <rect x="430" y="235" width="270" height="18" rx="3" fill="#123526" stroke="#3fb950"/>
+  <text x="565" y="248" text-anchor="middle" font-family="monospace" font-size="11" fill="#7ee787">lab: 28/28 FULLY_SIGNED</text>
+</svg>
+<figcaption id="fig-contrast-cap">Figure 1. Measured publication models — BIND commits/notifies per signing quantum; Knot signs then commits once.</figcaption>
+</figure>
+
+<p>Across a full four-stack battery (<code>ZONESIZE=10</code>, <code>MAX_ITERS=1</code>, modes <code>nsec</code> / <code>nsec3</code> / <code>nsec3optout</code>), this lab shows:</p>
+<ol><li><strong>BIND as BITW signer publishes partly signed zones.</strong> Every mid-sign race scenario against a BIND signer (<code>initial-sign</code>, <code>reload-resign</code>, <code>serial-bump</code>, <code>force-transfer</code>) returned <code>FAIL</code> / <code>PARTLY_SIGNED</code> on distribution AXFR — <strong>12/12</strong> in <code>BIND-BIND-BIND</code>, and <strong>12/12</strong> again in <code>BIND-BIND-KNOT</code> with Knot <code>dnssec-validation: off</code>.</li><li><strong>Knot as BITW signer does not.</strong> All <strong>28</strong> scenarios with a Knot signer (<code>BIND-KNOT-BIND</code> + <code>KNOT-KNOT-KNOT</code>) returned <code>PASS</code> / <code>FULLY_SIGNED</code>.</li><li><strong>Knot distribution with <code>dnssec-validation: on</code> refuses to serve the broken BIND-signed content.</strong> All <strong>14</strong> validate-on scenarios in <code>BIND-BIND-KNOT</code> returned <code>PASS</code> with status <code>AXFR_UNAVAILABLE</code> (distribution did not answer a usable SOA/AXFR). That is a <strong>distribution gate</strong>, not BIND signing atomicity.</li><li><strong>The BIND behaviour is intentional in code</strong>, not a lab false positive: <code>zone_sign()</code> commits and sets <code>NEEDNOTIFY</code> after each quantum. Coverage numbers in <code>RESULTS.md</code> match the captured AXFR bytes.</li></ol>
+<p>Scoreboard for the definitive run (70 scenarios):</p>
+<table><thead><tr>
+<th>Stack</th>
+<th>Battery</th>
+<th>PASS</th>
+<th>FAIL</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr>
+<td><code>BIND-BIND-BIND</code></td>
+<td><code>20261014T195345Z-run-all-10m-FAIL</code></td>
+<td>2</td>
+<td>12</td>
+<td>Only <code>nsec-flip-transfer</code> passed (both NSEC and NSEC3)</td>
+</tr>
+<tr>
+<td><code>BIND-BIND-KNOT</code></td>
+<td><code>20261014T200801Z-run-all-10m-FAIL</code></td>
+<td>16</td>
+<td>12</td>
+<td>2 flip PASS + 14 validate-on (<code>AXFR_UNAVAILABLE</code>)</td>
+</tr>
+<tr>
+<td><code>BIND-KNOT-BIND</code></td>
+<td><code>20261014T202832Z-run-all-10m-PASS</code></td>
+<td>14</td>
+<td>0</td>
+<td>Knot signer → BIND distribution</td>
+</tr>
+<tr>
+<td><code>KNOT-KNOT-KNOT</code></td>
+<td><code>20261014T203520Z-run-all-10m-PASS</code></td>
+<td>14</td>
+<td>0</td>
+<td>All Knot</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>46</strong></td>
+<td><strong>24</strong></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2 id="topology-under-test">Topology under test</h2>
+<p>Stacks are named <strong>PRIMARY-SIGNER-DISTRIBUTION</strong>:</p>
+<pre><code>primary (unsigned)  --AXFR--&gt;  signer (on-secondary DNSSEC)
+                                      |
+                                      | AXFR/IXFR (BITW contract: fully signed)
+                                      v
+                               distribution (secondary)</code></pre>
+<table><thead><tr>
+<th>Stack</th>
+<th>Primary</th>
+<th>Signer</th>
+<th>Distribution</th>
+<th>Host nets / DNS ports</th>
+</tr></thead><tbody>
+<tr>
+<td><code>BIND-BIND-BIND</code></td>
+<td>BIND</td>
+<td>BIND inline-signing</td>
+<td>BIND</td>
+<td><code>172.30.53.0/24</code> · 15353–15355</td>
+</tr>
+<tr>
+<td><code>BIND-BIND-KNOT</code></td>
+<td>BIND</td>
+<td>BIND inline-signing</td>
+<td>Knot (± validation)</td>
+<td><code>172.30.55.0/24</code> · 35353–35355</td>
+</tr>
+<tr>
+<td><code>BIND-KNOT-BIND</code></td>
+<td>BIND</td>
+<td>Knot on-secondary</td>
+<td>BIND</td>
+<td><code>172.30.56.0/24</code> · 45353–45355</td>
+</tr>
+<tr>
+<td><code>KNOT-KNOT-KNOT</code></td>
+<td>Knot</td>
+<td>Knot on-secondary</td>
+<td>Knot</td>
+<td><code>172.30.54.0/24</code> · 25353–25355</td>
+</tr>
+</tbody></table>
+<p>Zones: <code>nsec.test.example</code>, <code>nsec3.test.example</code>, <code>nsec3optout.test.example</code> (~10 MiB each). BIND signer knobs that widen the race (<code>BIND-*/config/signer/named.conf</code>):</p>
+<ul><li><code>sig-signing-nodes 25;</code></li><li><code>sig-signing-signatures 25;</code></li></ul>
+<p>ARM: <a href="https://bind9.readthedocs.io/en/v9.20.29/reference.html#namedconf-statement-sig-signing-nodes"><code>sig-signing-nodes</code></a>, <a href="https://bind9.readthedocs.io/en/v9.20.29/reference.html#namedconf-statement-sig-signing-signatures"><code>sig-signing-signatures</code></a>.</p>
+<p>Oracle: <code>COMMON/scripts/check-zone-signed.sh</code> classifies distribution (or signer) AXFR as <code>FULLY_SIGNED</code> / <code>PARTLY_SIGNED</code> / <code>UNSIGNED</code> / (BBK validate-on) <code>AXFR_UNAVAILABLE</code>.</p>
+<h2 id="definitive-results">Definitive results</h2>
+
+<figure class="fig" aria-labelledby="fig-score-cap">
+<svg viewBox="0 0 760 210" role="img" aria-label="Pass fail scoreboard across four stacks">
+  <text x="20" y="28" font-family="Georgia, serif" font-size="15" font-weight="700" fill="#e6edf3">Definitive battery — 70 scenarios</text>
+  <!-- BBB -->
+  <g transform="translate(20,50)">
+    <rect width="170" height="140" rx="8" fill="#1c2128" stroke="#30363d"/>
+    <text x="85" y="28" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#58a6ff">BIND-BIND-BIND</text>
+    <text x="85" y="70" text-anchor="middle" font-family="monospace" font-size="28" font-weight="700" fill="#f85149">12</text>
+    <text x="85" y="92" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#f85149">FAIL</text>
+    <text x="85" y="120" text-anchor="middle" font-family="monospace" font-size="18" fill="#3fb950">2</text>
+    <text x="85" y="138" text-anchor="middle" font-family="Georgia, serif" font-size="11" fill="#3fb950">PASS (flip only)</text>
+  </g>
+  <g transform="translate(205,50)">
+    <rect width="170" height="140" rx="8" fill="#1c2128" stroke="#30363d"/>
+    <text x="85" y="28" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#58a6ff">BIND-BIND-KNOT</text>
+    <text x="85" y="70" text-anchor="middle" font-family="monospace" font-size="28" font-weight="700" fill="#f85149">12</text>
+    <text x="85" y="92" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#f85149">FAIL (val-off)</text>
+    <text x="85" y="120" text-anchor="middle" font-family="monospace" font-size="18" fill="#3fb950">16</text>
+    <text x="85" y="138" text-anchor="middle" font-family="Georgia, serif" font-size="11" fill="#3fb950">PASS (val-on+flip)</text>
+  </g>
+  <g transform="translate(390,50)">
+    <rect width="170" height="140" rx="8" fill="#1c2128" stroke="#30363d"/>
+    <text x="85" y="28" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#3fb950">BIND-KNOT-BIND</text>
+    <text x="85" y="80" text-anchor="middle" font-family="monospace" font-size="36" font-weight="700" fill="#3fb950">14</text>
+    <text x="85" y="110" text-anchor="middle" font-family="Georgia, serif" font-size="13" fill="#3fb950">PASS / 0 FAIL</text>
+    <text x="85" y="132" text-anchor="middle" font-family="monospace" font-size="11" fill="#8b949e">Knot signer</text>
+  </g>
+  <g transform="translate(575,50)">
+    <rect width="165" height="140" rx="8" fill="#1c2128" stroke="#30363d"/>
+    <text x="82" y="28" text-anchor="middle" font-family="monospace" font-size="11" font-weight="700" fill="#3fb950">KNOT-KNOT-KNOT</text>
+    <text x="82" y="80" text-anchor="middle" font-family="monospace" font-size="36" font-weight="700" fill="#3fb950">14</text>
+    <text x="82" y="110" text-anchor="middle" font-family="Georgia, serif" font-size="13" fill="#3fb950">PASS / 0 FAIL</text>
+    <text x="82" y="132" text-anchor="middle" font-family="monospace" font-size="11" fill="#8b949e">all Knot</text>
+  </g>
+</svg>
+<figcaption id="fig-score-cap">Figure 2. Scoreboard from the 2026-10-14 ZONESIZE=10 full battery.</figcaption>
+</figure>
+
+<h3 id="bind-bind-bind-bind-signer-publishes-mid-sign-12-fail-2-pass">BIND-BIND-BIND — BIND signer publishes mid-sign (12 FAIL / 2 PASS)</h3>
+<p>Battery: <code>BIND-BIND-BIND/artifacts/20261014T195345Z-run-all-10m-FAIL</code></p>
+<table><thead><tr>
+<th>Scenario</th>
+<th>Verdict</th>
+<th>Status</th>
+<th>SOA</th>
+<th>Signed / signable</th>
+<th>Missing</th>
+</tr></thead><tbody>
+<tr>
+<td><code>nsec/initial-sign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>389</td>
+<td>3 / 202830</td>
+<td>202827</td>
+</tr>
+<tr>
+<td><code>nsec/reload-resign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>3932</td>
+<td>1808 / 289734</td>
+<td>287926</td>
+</tr>
+<tr>
+<td><code>nsec/serial-bump</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>426</td>
+<td>3 / 203755</td>
+<td>203752</td>
+</tr>
+<tr>
+<td><code>nsec/force-transfer</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>548</td>
+<td>3 / 206755</td>
+<td>206752</td>
+</tr>
+<tr>
+<td><code>nsec/nsec-flip-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>14597</td>
+<td>289734 / 289734</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/initial-sign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>438</td>
+<td>3048 / 196199</td>
+<td>193151</td>
+</tr>
+<tr>
+<td><code>nsec3/reload-resign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>3736</td>
+<td>26134 / 219285</td>
+<td>193151</td>
+</tr>
+<tr>
+<td><code>nsec3/serial-bump</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>451</td>
+<td>3139 / 196290</td>
+<td>193151</td>
+</tr>
+<tr>
+<td><code>nsec3/force-transfer</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>581</td>
+<td>4035 / 197186</td>
+<td>193151</td>
+</tr>
+<tr>
+<td><code>nsec3/nsec-flip-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>24534</td>
+<td>289755 / 289755</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/initial-sign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>424</td>
+<td>2950 / 195941</td>
+<td>192991</td>
+</tr>
+<tr>
+<td><code>nsec3optout/reload-resign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>3723</td>
+<td>26043 / 219034</td>
+<td>192991</td>
+</tr>
+<tr>
+<td><code>nsec3optout/serial-bump</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>422</td>
+<td>2936 / 195927</td>
+<td>192991</td>
+</tr>
+<tr>
+<td><code>nsec3optout/force-transfer</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>595</td>
+<td>4133 / 197124</td>
+<td>192991</td>
+</tr>
+</tbody></table>
+<p><strong>What FAIL means here.</strong> Distribution served an AXFR whose RRSIG coverage was incomplete while the signer was still signing. Representative capture (<code>20261014T195346Z-nsec-initial-sign-FAIL</code>):</p>
+<table><thead><tr>
+<th>Evidence</th>
+<th>Value</th>
+</tr></thead><tbody>
+<tr>
+<td>Distribution AXFR SOA</td>
+<td><code>389</code></td>
+</tr>
+<tr>
+<td>Signed / signable</td>
+<td><strong>3 / 202830</strong></td>
+</tr>
+<tr>
+<td>Signer <code>rndc zonestatus</code></td>
+<td><code>secure: no</code>, signed serial climbing (<code>608</code> at status capture)</td>
+</tr>
+<tr>
+<td>Signer <code>rndc signing -list</code></td>
+<td><code>Signing with key …</code> (not done)</td>
+</tr>
+<tr>
+<td>Serials at capture</td>
+<td>primary <code>1</code>, signer <code>613</code>, distribution <code>560</code></td>
+</tr>
+<tr>
+<td>Signer xfer-out</td>
+<td>AXFR to <code>172.30.53.30</code> at serials <strong>389</strong> then <strong>560</strong> while signing still in progress</td>
+</tr>
+</tbody></table>
+<p>NSEC3 / NSEC3-optout FAILs are the same class with more progress (thousands of RRSIGs present, ~193k still missing). That matches quantum signing mid-flight, not an empty zone.</p>
+<p><strong><code>nsec-flip-transfer</code> PASS.</strong> Under <code>MAX_ITERS=1</code>, after waiting for an initial <code>FULLY_SIGNED</code> warmup, flipping NSEC↔NSEC3 and force-transferring did <strong>not</strong> capture a <code>PARTLY_SIGNED</code> distribution AXFR. That does <strong>not</strong> contradict the mid-sign publication finding; it means this particular one-shot flip path did not hit the race window in this battery.</p>
+<h3 id="bind-bind-knot-same-bind-signer-race-validation-gates-the-wire">BIND-BIND-KNOT — same BIND signer race; validation gates the wire</h3>
+<p>Battery: <code>BIND-BIND-KNOT/artifacts/20261014T200801Z-run-all-10m-FAIL</code></p>
+<h4 id="dnssec-validation-off-12-fail-2-pass"><code>dnssec-validation: off</code> (12 FAIL / 2 PASS)</h4>
+<p>Same pattern as all-BIND. Distribution accepts and re-serves the partly signed zone:</p>
+<table><thead><tr>
+<th>Scenario</th>
+<th>Verdict</th>
+<th>Status</th>
+<th>SOA</th>
+<th>Signed / signable</th>
+<th>Missing</th>
+</tr></thead><tbody>
+<tr>
+<td><code>nsec/…/initial-sign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>385</td>
+<td>3 / 202730</td>
+<td>202727</td>
+</tr>
+<tr>
+<td><code>nsec/…/reload-resign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>3950</td>
+<td>2294 / 289734</td>
+<td>287440</td>
+</tr>
+<tr>
+<td><code>nsec/…/serial-bump</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>293</td>
+<td>3 / 200430</td>
+<td>200427</td>
+</tr>
+<tr>
+<td><code>nsec/…/force-transfer</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>401</td>
+<td>3 / 203080</td>
+<td>203077</td>
+</tr>
+<tr>
+<td><code>nsec/…/nsec-flip-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>14597</td>
+<td>289734 / 289734</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/…/initial-sign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>417</td>
+<td>2901 / 196052</td>
+<td>193151</td>
+</tr>
+<tr>
+<td><code>nsec3/…/reload-resign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>3671</td>
+<td>25679 / 218830</td>
+<td>193151</td>
+</tr>
+<tr>
+<td><code>nsec3/…/serial-bump</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>400</td>
+<td>2782 / 195933</td>
+<td>193151</td>
+</tr>
+<tr>
+<td><code>nsec3/…/force-transfer</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>595</td>
+<td>4133 / 197284</td>
+<td>193151</td>
+</tr>
+<tr>
+<td><code>nsec3/…/nsec-flip-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>24534</td>
+<td>289755 / 289755</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/…/initial-sign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>410</td>
+<td>2852 / 195843</td>
+<td>192991</td>
+</tr>
+<tr>
+<td><code>nsec3optout/…/reload-resign</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>3657</td>
+<td>25581 / 218572</td>
+<td>192991</td>
+</tr>
+<tr>
+<td><code>nsec3optout/…/serial-bump</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>441</td>
+<td>3069 / 196060</td>
+<td>192991</td>
+</tr>
+<tr>
+<td><code>nsec3optout/…/force-transfer</code></td>
+<td><span class="badge bad">FAIL</span></td>
+<td>PARTLY_SIGNED</td>
+<td>590</td>
+<td>4098 / 197089</td>
+<td>192991</td>
+</tr>
+</tbody></table>
+<h4 id="dnssec-validation-on-14-pass-all-axfr-unavailable"><code>dnssec-validation: on</code> (14 PASS — all <code>AXFR_UNAVAILABLE</code>)</h4>
+<table><thead><tr>
+<th>Result</th>
+<th>Meaning</th>
+</tr></thead><tbody>
+<tr>
+<td>Verdict <code>PASS</code></td>
+<td>Lab treats “distribution did not serve UNSIGNED/PARTLY_SIGNED” as success when <code>--allow-axfr-unavailable</code> is set</td>
+</tr>
+<tr>
+<td>Status <code>AXFR_UNAVAILABLE</code></td>
+<td>No usable SOA/AXFR from Knot distribution during the check</td>
+</tr>
+</tbody></table>
+<p>So with validation on, Knot <strong>does not republish</strong> the half-signed BIND content to the checker. The BIND signer race is unchanged; the distribution role refuses to be a loudspeaker for it.</p>
+<h3 id="bind-knot-bind-knot-signer-bind-distribution-14-14-pass">BIND-KNOT-BIND — Knot signer, BIND distribution (14/14 PASS)</h3>
+<p>Battery: <code>BIND-KNOT-BIND/artifacts/20261014T202832Z-run-all-10m-PASS</code></p>
+<table><thead><tr>
+<th>Scenario</th>
+<th>Verdict</th>
+<th>Status</th>
+<th>SOA</th>
+<th>Signed / signable</th>
+<th>Missing</th>
+</tr></thead><tbody>
+<tr>
+<td><code>nsec/initial-sign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>3</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec/reload-resign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>4</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec/serial-bump</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>5</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec/force-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>7</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec/nsec-flip-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>8</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/initial-sign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>7</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/reload-resign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>8</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/serial-bump</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>9</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/force-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>11</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/nsec-flip-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>12</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/initial-sign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>12</td>
+<td>289493 / 289493</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/reload-resign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>13</td>
+<td>289493 / 289493</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/serial-bump</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>14</td>
+<td>289493 / 289493</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/force-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>16</td>
+<td>289493 / 289493</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<h3 id="knot-knot-knot-all-knot-14-14-pass">KNOT-KNOT-KNOT — all Knot (14/14 PASS)</h3>
+<p>Battery: <code>KNOT-KNOT-KNOT/artifacts/20261014T203520Z-run-all-10m-PASS</code></p>
+<table><thead><tr>
+<th>Scenario</th>
+<th>Verdict</th>
+<th>Status</th>
+<th>SOA</th>
+<th>Signed / signable</th>
+<th>Missing</th>
+</tr></thead><tbody>
+<tr>
+<td><code>nsec/initial-sign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>10</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec/reload-resign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>11</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec/serial-bump</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>12</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec/force-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>14</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec/nsec-flip-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>15</td>
+<td>289735 / 289735</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/initial-sign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>10</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/reload-resign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>11</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/serial-bump</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>12</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/force-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>14</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3/nsec-flip-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>15</td>
+<td>289733 / 289733</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/initial-sign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>14</td>
+<td>289493 / 289493</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/reload-resign</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>15</td>
+<td>289493 / 289493</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/serial-bump</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>16</td>
+<td>289493 / 289493</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>nsec3optout/force-transfer</code></td>
+<td><span class="badge ok">PASS</span></td>
+<td>FULLY_SIGNED</td>
+<td>18</td>
+<td>289493 / 289493</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<h2 id="how-the-fail-is-produced-timelines">How the FAIL is produced (timelines)</h2>
+<p>These timelines describe what the lab scripts <strong>do</strong> and <strong>when they check</strong>, tied to what BIND <strong>publishes</strong>.</p>
+<h3 id="timeline-a-initial-sign-canonical-bind-fail">Timeline A — <code>initial-sign</code> (canonical BIND FAIL)</h3>
+
+<figure class="fig" aria-labelledby="fig-tl-a-cap">
+<svg viewBox="0 0 780 320" role="img" aria-label="initial-sign timeline showing when lab checks and when BIND publishes">
+  <text x="20" y="28" font-family="Georgia, serif" font-size="15" font-weight="700" fill="#e6edf3">Timeline A — initial-sign (BIND FAIL)</text>
+  <line x1="40" y1="250" x2="740" y2="250" stroke="#6e7681" stroke-width="2"/>
+  <text x="40" y="275" font-family="monospace" font-size="11" fill="#8b949e">t →</text>
+  <!-- primary -->
+  <rect x="40" y="60" width="120" height="50" rx="6" fill="#1c2128" stroke="#6e7681"/>
+  <text x="100" y="80" text-anchor="middle" font-family="monospace" font-size="11" fill="#c9d1d9">PRIMARY</text>
+  <text x="100" y="98" text-anchor="middle" font-family="monospace" font-size="10" fill="#8b949e">unsigned s=1</text>
+  <line x1="100" y1="110" x2="100" y2="250" stroke="#6e7681" stroke-dasharray="3 3"/>
+  <circle cx="100" cy="250" r="6" fill="#8b949e"/>
+  <!-- signer quanta -->
+  <rect x="200" y="50" width="130" height="70" rx="6" fill="#3d1517" stroke="#f85149"/>
+  <text x="265" y="72" text-anchor="middle" font-family="monospace" font-size="11" fill="#ff7b72">SIGNER Q1</text>
+  <text x="265" y="90" text-anchor="middle" font-family="monospace" font-size="10" fill="#f85149">commit+NOTIFY</text>
+  <text x="265" y="108" text-anchor="middle" font-family="monospace" font-size="10" fill="#f85149">~3 RRSIGs</text>
+  <line x1="265" y1="120" x2="265" y2="250" stroke="#f85149"/>
+  <circle cx="265" cy="250" r="6" fill="#f85149"/>
+  <rect x="360" y="50" width="130" height="70" rx="6" fill="#3d1517" stroke="#f85149"/>
+  <text x="425" y="72" text-anchor="middle" font-family="monospace" font-size="11" fill="#ff7b72">SIGNER Q2…</text>
+  <text x="425" y="90" text-anchor="middle" font-family="monospace" font-size="10" fill="#f85149">still Signing</text>
+  <text x="425" y="108" text-anchor="middle" font-family="monospace" font-size="10" fill="#f85149">serial climbing</text>
+  <line x1="425" y1="120" x2="425" y2="250" stroke="#f85149"/>
+  <circle cx="425" cy="250" r="6" fill="#f85149"/>
+  <!-- dist + check -->
+  <rect x="520" y="50" width="140" height="70" rx="6" fill="#2a1a0a" stroke="#db6d28"/>
+  <text x="590" y="72" text-anchor="middle" font-family="monospace" font-size="11" fill="#db6d28">DISTRIB AXFR</text>
+  <text x="590" y="90" text-anchor="middle" font-family="monospace" font-size="10" fill="#db6d28">serial 389</text>
+  <text x="590" y="108" text-anchor="middle" font-family="monospace" font-size="10" fill="#db6d28">3/202830</text>
+  <line x1="590" y1="120" x2="590" y2="250" stroke="#db6d28"/>
+  <circle cx="590" cy="250" r="6" fill="#db6d28"/>
+  <rect x="680" y="140" width="80" height="50" rx="6" fill="#3d1517" stroke="#f85149"/>
+  <text x="720" y="162" text-anchor="middle" font-family="monospace" font-size="11" fill="#ff7b72">CHECK</text>
+  <text x="720" y="180" text-anchor="middle" font-family="monospace" font-size="10" fill="#f85149">FAIL</text>
+  <path d="M590 175 H680" stroke="#f85149" stroke-width="2"/>
+  <text x="390" y="305" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#8b949e">Lab: compose_fresh → retransfer → one AXFR poll (MAX_ITERS=1) → classify</text>
+</svg>
+<figcaption id="fig-tl-a-cap">Figure 3. When the incomplete zone is published versus when the lab checks (NSEC initial-sign evidence).</figcaption>
+</figure>
+
+<pre><code>t ──────────────────────────────────────────────────────────────────►
+
+PRIMARY     [ generate unsigned zone serial=1 ]
+               │
+               │  compose up / AXFR
+               ▼
+SIGNER      [ load unsigned ]──►[ zone_sign quantum 1 ]──► commit + NEEDNOTIFY
+               │                      │
+               │                      │  ~10 ms later
+               │                      ▼
+               │                 [ quantum 2 ]──► commit + NEEDNOTIFY ──► …
+               │                      │
+               │                      │  still “Signing with key…”
+               ▼                      ▼
+DISTRIB     [ NOTIFY / retransfer ]──► AXFR serial 389 (3 RRSIGs / ~203k)
+               │
+LAB CHECK   ══════════════════════════╤══════════════════════════════
+                                      │  check-zone-signed.sh
+                                      ▼
+                                 PARTLY_SIGNED → FAIL
+                                 (status.txt: secure:no, Signing with key)</code></pre>
+<p><strong>Lab steps (evidence):</strong> <code>compose_fresh</code> → <code>wait-ready</code> → <code>rndc distribution retransfer</code> → poll distribution AXFR once (<code>MAX_ITERS=1</code>) → classify → capture <code>status.txt</code> / logs.</p>
+<p><strong>BIND steps (evidence):</strong> inbound unsigned AXFR serial <code>1</code> at <code>19:53:52Z</code>; outbound AXFR to distribution at serial <code>389</code> at <code>19:53:57Z</code> while signing list still shows active keys; checker records <code>3/202830</code> signed.</p>
+<h3 id="timeline-b-reload-resign-force-transfer-serial-bump">Timeline B — <code>reload-resign</code> / <code>force-transfer</code> / <code>serial-bump</code></h3>
+
+<figure class="fig" aria-labelledby="fig-tl-b-cap">
+<svg viewBox="0 0 780 250" role="img" aria-label="reload-resign serial-bump force-transfer timeline">
+  <text x="20" y="28" font-family="Georgia, serif" font-size="15" font-weight="700" fill="#e6edf3">Timeline B — reload / serial-bump / force-transfer</text>
+  <line x1="40" y1="190" x2="740" y2="190" stroke="#6e7681" stroke-width="2"/>
+  <rect x="50" y="55" width="150" height="60" rx="6" fill="#152238" stroke="#58a6ff"/>
+  <text x="125" y="80" text-anchor="middle" font-family="monospace" font-size="11" fill="#79c0ff">warm / mid-sign</text>
+  <text x="125" y="98" text-anchor="middle" font-family="monospace" font-size="10" fill="#8b949e">signer state</text>
+  <line x1="125" y1="115" x2="125" y2="190" stroke="#58a6ff" stroke-dasharray="3 3"/>
+  <circle cx="125" cy="190" r="6" fill="#58a6ff"/>
+  <rect x="240" y="50" width="200" height="70" rx="6" fill="#2a1f0a" stroke="#d29922"/>
+  <text x="340" y="72" text-anchor="middle" font-family="monospace" font-size="11" fill="#e3b341">LAB ACTION</text>
+  <text x="340" y="90" text-anchor="middle" font-family="monospace" font-size="10" fill="#d29922">rndc sign · serial bump</text>
+  <text x="340" y="108" text-anchor="middle" font-family="monospace" font-size="10" fill="#d29922">or force retransfer</text>
+  <line x1="340" y1="120" x2="340" y2="190" stroke="#d29922"/>
+  <circle cx="340" cy="190" r="6" fill="#d29922"/>
+  <rect x="480" y="50" width="150" height="70" rx="6" fill="#3d1517" stroke="#f85149"/>
+  <text x="555" y="80" text-anchor="middle" font-family="monospace" font-size="11" fill="#ff7b72">quantum publish</text>
+  <text x="555" y="100" text-anchor="middle" font-family="monospace" font-size="10" fill="#f85149">NEEDNOTIFY again</text>
+  <line x1="555" y1="120" x2="555" y2="190" stroke="#f85149"/>
+  <circle cx="555" cy="190" r="6" fill="#f85149"/>
+  <rect x="660" y="55" width="100" height="60" rx="6" fill="#3d1517" stroke="#f85149"/>
+  <text x="710" y="80" text-anchor="middle" font-family="monospace" font-size="11" fill="#ff7b72">CHECK</text>
+  <text x="710" y="100" text-anchor="middle" font-family="monospace" font-size="10" fill="#f85149">PARTLY</text>
+  <line x1="710" y1="115" x2="710" y2="190" stroke="#f85149"/>
+  <circle cx="710" cy="190" r="6" fill="#f85149"/>
+  <text x="390" y="230" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#8b949e">Reload FAILs show higher SOA / more RRSIGs than cold initial-sign — resign mid-flight, still incomplete</text>
+</svg>
+<figcaption id="fig-tl-b-cap">Figure 3b. Lab-triggered resign / serial / retransfer re-opens the quantum publish window.</figcaption>
+</figure>
+
+<pre><code>t ──────────────────────────────────────────────────────────────────►
+
+SIGNER      [ … reach Done signing (reload) or mid-sign window … ]
+               │
+LAB ACTION  ───┼── rndc sign/loadkeys     (reload-resign)
+               ├── bump primary serial    (serial-bump)
+               └── rndc retransfer/sign   (force-transfer)
+               │
+SIGNER      [ new signing work / quantum commits + NEEDNOTIFY ]
+               │
+DISTRIB     [ transfers intermediate signed serial ]
+               │
+LAB CHECK   ──► distribution AXFR ──► PARTLY_SIGNED → FAIL</code></pre>
+<p>Measured pattern: reload-resign FAILs show <strong>higher</strong> SOA and <strong>more</strong> RRSIGs than cold <code>initial-sign</code> (e.g. NSEC reload <code>1808/289734</code> vs initial <code>3/202830</code>) — resign is in progress, not “unsigned from scratch,” but still incomplete at the check instant.</p>
+<h3 id="timeline-c-knot-signer-why-bkb-kkk-pass">Timeline C — Knot signer (why BKB / KKK PASS)</h3>
+
+<figure class="fig" aria-labelledby="fig-tl-c-cap">
+<svg viewBox="0 0 780 260" role="img" aria-label="Knot signer timeline showing sign before commit">
+  <text x="20" y="28" font-family="Georgia, serif" font-size="15" font-weight="700" fill="#e6edf3">Timeline C — Knot signer (BKB / KKK PASS)</text>
+  <line x1="40" y1="200" x2="740" y2="200" stroke="#6e7681" stroke-width="2"/>
+  <rect x="60" y="60" width="130" height="55" rx="6" fill="#1c2128" stroke="#6e7681"/>
+  <text x="125" y="82" text-anchor="middle" font-family="monospace" font-size="11" fill="#c9d1d9">inbound XFR</text>
+  <text x="125" y="100" text-anchor="middle" font-family="monospace" font-size="10" fill="#8b949e">held in update</text>
+  <line x1="125" y1="115" x2="125" y2="200" stroke="#6e7681" stroke-dasharray="3 3"/>
+  <circle cx="125" cy="200" r="6" fill="#8b949e"/>
+  <rect x="240" y="55" width="160" height="65" rx="6" fill="#12261f" stroke="#3fb950"/>
+  <text x="320" y="80" text-anchor="middle" font-family="monospace" font-size="11" fill="#7ee787">knot_dnssec_zone_sign</text>
+  <text x="320" y="100" text-anchor="middle" font-family="monospace" font-size="10" fill="#3fb950">entire update</text>
+  <line x1="320" y1="120" x2="320" y2="200" stroke="#3fb950"/>
+  <circle cx="320" cy="200" r="6" fill="#3fb950"/>
+  <rect x="450" y="55" width="150" height="65" rx="6" fill="#059669" stroke="#3fb950"/>
+  <text x="525" y="80" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">zone_update_commit</text>
+  <text x="525" y="100" text-anchor="middle" font-family="monospace" font-size="10" fill="#d2f4d2">then NOTIFY</text>
+  <line x1="525" y1="120" x2="525" y2="200" stroke="#3fb950"/>
+  <circle cx="525" cy="200" r="6" fill="#3fb950"/>
+  <rect x="640" y="55" width="110" height="65" rx="6" fill="#12261f" stroke="#3fb950"/>
+  <text x="695" y="80" text-anchor="middle" font-family="monospace" font-size="11" fill="#7ee787">DISTRIB AXFR</text>
+  <text x="695" y="100" text-anchor="middle" font-family="monospace" font-size="10" fill="#3fb950">FULLY_SIGNED</text>
+  <line x1="695" y1="120" x2="695" y2="200" stroke="#3fb950"/>
+  <circle cx="695" cy="200" r="6" fill="#3fb950"/>
+  <text x="390" y="240" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#8b949e">No half-signed publication window for the inbound-XFR sign path — 28/28 PASS in this battery</text>
+</svg>
+<figcaption id="fig-tl-c-cap">Figure 4. Knot signs inside the update, commits once, then notifies — matching all Knot-signer lab results.</figcaption>
+</figure>
+
+<pre><code>t ──────────────────────────────────────────────────────────────────►
+
+PRIMARY     [ unsigned AXFR/IXFR ]
+               │
+SIGNER      [ hold in zone_update ]──► knot_dnssec_zone_sign / sign_update
+               │                              │
+               │                              ▼
+               │                      zone_update_commit  (only after sign)
+               │                              │
+               │                              ▼
+               │                         schedule NOTIFY
+               ▼
+DISTRIB     [ AXFR only after commit ]──► FULLY_SIGNED
+               │
+LAB CHECK   ──► PASS</code></pre>
+<p>No published half-signed snapshot exists for the inbound-XFR-driven sign path. The lab’s distribution AXFRs confirm full coverage on every Knot-signer scenario in this battery.</p>
+<h3 id="timeline-d-bbk-dnssec-validation-on-pass-without-fully-signed">Timeline D — BBK <code>dnssec-validation: on</code> (PASS without FULLY_SIGNED)</h3>
+
+<figure class="fig" aria-labelledby="fig-tl-d-cap">
+<svg viewBox="0 0 780 220" role="img" aria-label="BBK validate-on gate timeline">
+  <text x="20" y="28" font-family="Georgia, serif" font-size="15" font-weight="700" fill="#e6edf3">Timeline D — BBK dnssec-validation: on</text>
+  <rect x="40" y="60" width="200" height="70" rx="6" fill="#3d1517" stroke="#f85149"/>
+  <text x="140" y="88" text-anchor="middle" font-family="monospace" font-size="12" fill="#ff7b72">BIND signer</text>
+  <text x="140" y="110" text-anchor="middle" font-family="monospace" font-size="11" fill="#f85149">still PARTLY_SIGNED</text>
+  <path d="M240 95 H320" stroke="#8b949e" stroke-width="2"/>
+  <rect x="320" y="60" width="220" height="70" rx="6" fill="#2a1f0a" stroke="#d29922"/>
+  <text x="430" y="88" text-anchor="middle" font-family="monospace" font-size="12" fill="#e3b341">Knot distribution</text>
+  <text x="430" y="110" text-anchor="middle" font-family="monospace" font-size="11" fill="#d29922">validation on → no SOA/AXFR</text>
+  <path d="M540 95 H620" stroke="#8b949e" stroke-width="2"/>
+  <rect x="620" y="60" width="130" height="70" rx="6" fill="#12261f" stroke="#3fb950"/>
+  <text x="685" y="88" text-anchor="middle" font-family="monospace" font-size="12" fill="#7ee787">LAB CHECK</text>
+  <text x="685" y="110" text-anchor="middle" font-family="monospace" font-size="11" fill="#3fb950">AXFR_UNAVAILABLE</text>
+  <text x="390" y="175" text-anchor="middle" font-family="Georgia, serif" font-size="13" fill="#8b949e">PASS means distribution did not republish bad content — not that BIND stopped publishing it</text>
+</svg>
+<figcaption id="fig-tl-d-cap">Figure 5. Validate-on is a distribution gate over an unchanged BIND signer race.</figcaption>
+</figure>
+
+<pre><code>BIND SIGNER     still publishes PARTLY_SIGNED intermediates
+        │
+        │  XFR / NOTIFY
+        ▼
+KNOT DIST       dnssec-validation: on ──► refuses usable SOA/AXFR
+        │
+LAB CHECK       AXFR_UNAVAILABLE → PASS (allowed)
+                (does not prove BIND stopped mid-sign publish)</code></pre>
+<h2 id="the-operational-surprise">The operational surprise</h2>
+<p>BITW operators typically assume:</p>
+<ol><li>Signer loads the unsigned zone from the hidden primary.</li><li>Inline / on-secondary signing produces a signed view.</li><li>Downstream only ever sees a <strong>fully signed</strong> zone (or is not notified of incomplete ones).</li></ol>
+<p><strong>What BIND did in this lab during initial key signing of a ~10 MiB zone:</strong></p>
+<ol><li>Sign in <strong>quanta</strong> (<code>sig-signing-nodes</code> / <code>sig-signing-signatures</code>).</li><li>After each quantum that changed the zone: bump signed SOA, <strong>commit</strong>, set <strong><code>NEEDNOTIFY</code></strong>.</li><li>Distribution transferred that intermediate (AXFR serials <code>389</code>, then <code>560</code> in the NSEC initial-sign artifact).</li><li>Signing continued (<code>Signing with key…</code>, <code>secure: no</code>).</li></ol>
+<p>There is <strong>no</strong> transfer gate that waits for <code>Done signing</code> before outbound XFR. Lower quantum sizes make the race easier to observe; the commit-per-quantum design also exists at BIND defaults (<code>nodes=100</code>, <code>signatures=10</code>).</p>
+<h2 id="bind-code-trace-intentional-behaviour">BIND code trace (intentional behaviour)</h2>
+<p>Source: BIND <code>v9.20.29</code> / <code>c3d4465</code>, primarily <code>lib/dns/zone.c</code> and <code>lib/dns/qpzone.c</code>.</p>
+<h3 id="1-quantum-limits">1. Quantum limits</h3>
+<pre><code>/* lib/dns/zone.c — zone defaults */
+.signatures = 10,
+.nodes = 100,</code></pre>
+<p>Configured via <code>sig-signing-nodes</code> / <code>sig-signing-signatures</code>.</p>
+<h3 id="2-zone-sign-commits-and-notifies-per-quantum">2. <code>zone_sign()</code> commits and notifies per quantum</h3>
+<pre><code>/* lib/dns/zone.c — zone_sign() */
+nodes = zone-&gt;nodes;
+signatures = zone-&gt;signatures;
+/* … apply signatures for this quantum … */
+dns_db_closeversion(db, &amp;version, commit);
+if (commit) {
+    DNS_ZONE_SETFLAG(zone, DNS_ZONEFLG_NEEDNOTIFY);
+    zone_needdump(zone, DNS_DUMP_DELAY);
+}</code></pre>
+<p>Next quantum ~<strong>10 ms</strong> later while <code>zone-&gt;signing</code> remains non-empty.</p>
+<p><strong>Implication:</strong> every successful quantum that changes the zone is a <strong>published, notifiable</strong> version — including versions with only a handful of RRSIGs into a ~200k-RRset zone. That is exactly what the FAIL artifacts contain.</p>
+<h3 id="3-secure-is-not-fully-signed">3. <code>secure</code> is not “fully signed”</h3>
+<p><code>rndc zonestatus</code> <code>secure:</code> comes from <code>setsecure()</code> (NSEC/NSEC3 presence), <strong>not</strong> full RRSIG coverage. The lab’s <code>secure: no</code> during early initial sign matches that predicate.</p>
+<h3 id="4-lab-symptom-code">4. Lab symptom → code</h3>
+<table><thead><tr>
+<th>Lab symptom (this battery)</th>
+<th>Code explanation</th>
+</tr></thead><tbody>
+<tr>
+<td>Rising signed serials while primary stays at <code>1</code></td>
+<td>SOA bump + commit each quantum</td>
+</tr>
+<tr>
+<td>AXFR with only 3 RRSIGs (<code>nsec/initial-sign</code>)</td>
+<td>Early quantum: apex/DNSKEY/private type first</td>
+</tr>
+<tr>
+<td>Outbound xfer while <code>Signing with key</code></td>
+<td>No wait-for-done before XFR/notify</td>
+</tr>
+<tr>
+<td><code>secure: no</code> mid-sign</td>
+<td><code>setsecure()</code> ≠ full RRSIG coverage</td>
+</tr>
+<tr>
+<td>NSEC3 FAILs with thousands signed, ~193k missing</td>
+<td>Mid-chain quantum publish</td>
+</tr>
+</tbody></table>
+<h2 id="knot-dns-comparison">Knot DNS comparison</h2>
+<p>Knot’s documented on-secondary model: the zone is signed after every AXFR/IXFR from primary so the secondary <strong>always serves a signed up-to-date version</strong> (<a href="https://www.knot-dns.cz/docs/latest/html/configuration.html#on-secondary-on-slave-signing">On-secondary signing</a>).</p>
+<p>AXFR finalize (<code>v3.4.6</code> <code>refresh.c</code>): <code>knot_dnssec_zone_sign</code> → then <code>zone_update_commit</code>. IXFR: <code>knot_dnssec_sign_update</code> → then commit. NOTIFY is scheduled after a successful updated transfer (post sign+commit).</p>
+<table><thead><tr>
+<th>Concern</th>
+<th>BIND 9.20.29 (lab)</th>
+<th>Knot 3.6.1 (lab)</th>
+</tr></thead><tbody>
+<tr>
+<td>Mid-sign outbound half-signed AXFR?</td>
+<td><strong>Yes</strong> — measured 24 FAIL artifacts</td>
+<td><strong>No</strong> — 28/28 Knot-signer scenarios <code>FULLY_SIGNED</code></td>
+</tr>
+<tr>
+<td>NOTIFY timing</td>
+<td>After each successful signing quantum</td>
+<td>After successful refresh that updated the zone (post sign+commit)</td>
+</tr>
+<tr>
+<td>Publication vs signing completeness</td>
+<td>Overlapped</td>
+<td>Atomic at commit</td>
+</tr>
+</tbody></table>
+<p>Caveat: Knot can still take wall-clock time to sign a huge zone; the measured difference is <strong>visibility of incomplete signatures</strong>, not CPU.</p>
+<h2 id="is-this-a-bind-bug">Is this a BIND bug?</h2>
+<table><thead><tr>
+<th>Claim</th>
+<th>Assessment</th>
+</tr></thead><tbody>
+<tr>
+<td>Lab false positive / bad AXFR parse</td>
+<td><strong>No</strong> — coverage matches AXFR bytes; xfer logs show the serials served</td>
+</tr>
+<tr>
+<td>BIND coding accident</td>
+<td><strong>No</strong> — quantum commit + <code>NEEDNOTIFY</code> is explicit</td>
+</tr>
+<tr>
+<td>ARM promises “secondaries only get fully signed zones”</td>
+<td><strong>No</strong> — quantum sizes are documented; transfer gating on full coverage is not</td>
+</tr>
+<tr>
+<td>Operational surprise for BITW</td>
+<td><strong>Yes</strong> — confirmed across two BIND-signer stacks and three DNSSEC modes</td>
+</tr>
+<tr>
+<td>Knot-as-signer avoids the publication hazard</td>
+<td><strong>Yes</strong> — confirmed on <code>BIND-KNOT-BIND</code> and <code>KNOT-KNOT-KNOT</code></td>
+</tr>
+<tr>
+<td>Knot validate-on “fixes” BIND</td>
+<td><strong>No</strong> — it <strong>hides</strong> bad content at distribution; BIND still published it</td>
+</tr>
+</tbody></table>
+<p>Enhancement ask: optional “do not notify / allow-transfer until signing complete” (or until <code>secure</code> <strong>and</strong> no pending signing records) for inline-signing secondaries.</p>
+<h3 id="possible-bind-changes">Possible BIND changes</h3>
+<p>Two ways to get BITW-safe publication without changing quantum signing for CPU fairness:</p>
+<ul><li><strong>Approach A — gate publication while signing is incomplete (easy).</strong> Optional knob: suppress <code>NEEDNOTIFY</code> and refuse outbound AXFR/IXFR while <code>zone-&gt;signing</code> / <code>zone-&gt;nsec3chain</code> is non-empty (or equivalent “signing not done”). When the walk finishes, notify once. Small change in <code>zone_sign()</code> / <code>xfrout</code>; no DB redesign. Downstream keeps its last good zone until signing completes.</li><li><strong>Approach B — Knot-like atomic publish (hard).</strong> Keep serving the last fully signed version (or hold one uncommitted version) until the full sign finishes, then commit/notify once. Requires redesign of per-quantum <code>dns_db_closeversion(..., commit)</code> and journal behaviour; much larger effort.</li></ul>
+<h3 id="memory-bind-vs-knot">Memory (BIND vs Knot)</h3>
+<p>BIND inline-signing keeps ~2× steady-state RAM (<code>zone-&gt;raw</code> + <code>zone-&gt;db</code>); quantum commits keep the mid-sign working set small. Knot keeps ~1× signed zone in RAM and pays a higher peak during update because sign-then-commit holds the update before swap. Approach A adds essentially no RAM; Approach B would temporarily cost a pinned old signed view / staging during full re-sign.</p>
+<h2 id="bind-9-21-development-series">BIND 9.21 development series</h2>
+<p><strong>No</strong> — BIND 9.21 does not fix the mid-sign publish/transfer behaviour this lab hits.</p>
+<p>Checked against 9.21 notes (through <code>9.21.25</code>) and development <code>main</code> <code>zone_sign()</code>: each successful quantum still commits, bumps signed SOA, and sets <code>NEEDNOTIFY</code>.</p>
+<p><code>notify-defer</code> (9.21.9, <a href="https://gitlab.isc.org/isc-projects/bind9/-/issues/5259">GL #5259</a>) is a fixed NOTIFY delay. It does <strong>not</strong> wait for signing complete, does <strong>not</strong> block outbound AXFR/IXFR of intermediates, and does <strong>not</strong> change quantum commit.</p>
+<h2 id="evidence-checklist">Evidence checklist</h2>
+<p>From e.g. <code>BIND-BIND-BIND/artifacts/20261014T195346Z-nsec-initial-sign-FAIL/</code>:</p>
+<ul><li><code>RESULTS.md</code> — verdict / coverage table  </li><li><code>axfr-distribution.txt</code> / <code>BROKEN_ZONE.axfr</code> — served zone  </li><li><code>status.txt</code> — <code>secure</code>, signed serial, <code>signing -list</code>  </li><li><code>signer-xfer.log</code> — outbound AXFR serials during sign  </li><li><code>signer-dnssec.log</code> — signing activity in the window  </li><li><code>named -V</code> / <code>knotc</code> version from the running containers  </li></ul>
+<p>Full matrix: <a href="RESULTS.html"><code>RESULTS.html</code></a> (regenerate with <code>./make-results-html.sh</code>).</p>
+<h2 id="references">References</h2>
+<ol><li>BIND ARM 9.20.29 — <a href="https://bind9.readthedocs.io/en/v9.20.29/reference.html#namedconf-statement-sig-signing-nodes">sig-signing-nodes</a>, <a href="https://bind9.readthedocs.io/en/v9.20.29/reference.html#namedconf-statement-sig-signing-signatures">sig-signing-signatures</a>  </li><li>BIND 9.21 release notes — <a href="https://bind9.readthedocs.io/en/v9.21.25/notes.html">v9.21.25</a> (<code>notify-defer</code> / <a href="https://gitlab.isc.org/isc-projects/bind9/-/issues/5259">GL #5259</a>)  </li><li>BIND source <code>lib/dns/zone.c</code> (<code>zone_sign</code>, <code>receive_secure_serial</code>), <code>lib/dns/qpzone.c</code> (<code>setsecure</code>)  </li><li>Knot docs — <a href="https://www.knot-dns.cz/docs/latest/html/configuration.html#on-secondary-on-slave-signing">On-secondary signing</a>  </li><li>Knot source <code>src/knot/events/handlers/refresh.c</code> (AXFR/IXFR finalize: sign → commit → notify)  </li><li>knot-dns-users thread on BITW / <code>block-notify-after-transfer</code> (Libor Peltan, 2023-08)  </li><li>This repo: stack directories, <code>COMMON/scripts/check-zone-signed.sh</code>, batteries listed above, <a href="RESULTS.html"><code>RESULTS.html</code></a></li></ol>
+
+<footer>
+  Source: <a href="REPORT.md">REPORT.md</a> · Battery matrix: <a href="RESULTS.html">RESULTS.html</a> ·
+  Regenerate with <code>python3 COMMON/scripts/make-report-html.py</code>
+</footer>
+</div>
+</body>
+</html>

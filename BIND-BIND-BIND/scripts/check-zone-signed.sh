@@ -1,0 +1,1 @@
+../../COMMON/scripts/check-zone-signed.sh

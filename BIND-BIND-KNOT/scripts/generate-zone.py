@@ -1,0 +1,1 @@
+../../COMMON/scripts/generate-zone.py

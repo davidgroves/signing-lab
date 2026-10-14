@@ -1,0 +1,101 @@
+name: bind-resign-repro
+
+x-bind-common: &bind-common
+  image: internetsystemsconsortium/bind9:${BIND_TAG:-9.20}
+  entrypoint: ["/bin/sh", "/entrypoint/named-entrypoint.sh"]
+  environment:
+    - TZ=UTC
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "rndc status >/dev/null 2>&1"]
+    interval: 5s
+    timeout: 5s
+    retries: 12
+    start_period: 15s
+
+services:
+  primary:
+    <<: *bind-common
+    container_name: bind-primary
+    hostname: primary
+    networks:
+      dnsnet:
+        ipv4_address: 172.30.53.10
+    ports:
+      - "${PRIMARY_PORT:-15353}:53/udp"
+      - "${PRIMARY_PORT:-15353}:53/tcp"
+    volumes:
+      - ./scripts/named-entrypoint.sh:/entrypoint/named-entrypoint.sh:ro
+      - ./config/primary/named.conf:/etc/bind/named.conf:ro
+      - ./config/common/rndc.key:/etc/bind/rndc.key:ro
+      - ./config/common/rndc.conf:/etc/bind/rndc.conf:ro
+      - ./zones:/var/lib/bind/zones:ro
+      - primary-cache:/var/cache/bind
+      - primary-log:/var/log
+
+  signer:
+    <<: *bind-common
+    container_name: bind-signer
+    hostname: signer
+    environment:
+      - TZ=UTC
+      # Copy mounted named.conf.src -> /var/cache/bind/named.conf (writable for policy flips).
+      - NAMED_WRITABLE_CONF=1
+      - NAMED_CONF_SRC=/etc/bind/named.conf.src
+    depends_on:
+      primary:
+        condition: service_healthy
+    networks:
+      dnsnet:
+        ipv4_address: 172.30.53.20
+    ports:
+      - "${SIGNER_PORT:-15354}:53/udp"
+      - "${SIGNER_PORT:-15354}:53/tcp"
+    volumes:
+      - ./scripts/named-entrypoint.sh:/entrypoint/named-entrypoint.sh:ro
+      - ./config/signer/named.conf:/etc/bind/named.conf.src:ro
+      - ./config/common/rndc.key:/etc/bind/rndc.key:ro
+      - ./config/common/rndc.conf:/etc/bind/rndc.conf:ro
+      - ./keys:/etc/bind/keys
+      - signer-lib:/var/lib/bind
+      - signer-cache:/var/cache/bind
+      - signer-log:/var/log
+
+  distribution:
+    <<: *bind-common
+    container_name: bind-distribution
+    hostname: distribution
+    depends_on:
+      signer:
+        condition: service_healthy
+    networks:
+      dnsnet:
+        ipv4_address: 172.30.53.30
+    ports:
+      - "${DISTRIBUTION_PORT:-15355}:53/udp"
+      - "${DISTRIBUTION_PORT:-15355}:53/tcp"
+    volumes:
+      - ./scripts/named-entrypoint.sh:/entrypoint/named-entrypoint.sh:ro
+      - ./config/distribution/named.conf:/etc/bind/named.conf:ro
+      - ./config/common/rndc.key:/etc/bind/rndc.key:ro
+      - ./config/common/rndc.conf:/etc/bind/rndc.conf:ro
+      - distribution-lib:/var/lib/bind
+      - distribution-cache:/var/cache/bind
+      - distribution-log:/var/log
+
+networks:
+  dnsnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.53.0/24
+
+volumes:
+  primary-cache:
+  primary-log:
+  signer-lib:
+  signer-cache:
+  signer-log:
+  distribution-lib:
+  distribution-cache:
+  distribution-log:

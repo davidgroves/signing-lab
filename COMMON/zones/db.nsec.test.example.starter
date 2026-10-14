@@ -1,0 +1,15 @@
+$ORIGIN nsec.test.example.
+$TTL 300
+@	IN	SOA	ns1.nsec.test.example. hostmaster.nsec.test.example. (
+			1		; serial
+			30		; refresh
+			15		; retry
+			3600		; expire
+			300		; minimum
+			)
+	IN	NS	ns1.nsec.test.example.
+	IN	NS	ns2.nsec.test.example.
+ns1	IN	A	172.30.53.10
+ns2	IN	A	172.30.53.20
+smoke	IN	A	192.0.2.1
+smoke	IN	TXT	"starter-nsec"

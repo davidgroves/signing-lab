@@ -1,0 +1,28 @@
+# Generated zone data (starters live in COMMON/zones/*.starter)
+*/zones/db.*
+!*/zones/db.*.starter
+
+# DNSSEC / KASP material
+*/keys/K*
+*/keys/*.private
+*/keys/*.key
+*/keys/*.state
+*/storage/**/*
+!*/storage/**/.gitkeep
+*/rundir/**/*
+!*/rundir/**/.gitkeep
+
+# Artifacts
+*/artifacts/*/
+!*/artifacts/.gitkeep
+
+# Generated cross-stack summary (./make-results-html.sh)
+RESULTS.html
+
+*.jnl
+*.signed
+.env.local
+data/
+
+# Active Knot distribution conf is generated from validate-* templates
+BIND-BIND-KNOT/config/distribution/knot.conf

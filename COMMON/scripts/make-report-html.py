@@ -602,6 +602,7 @@ def build(md_path: Path, out_path: Path) -> None:
 {body}
 
 <footer>
+  Repository: <a href="https://github.com/davidgroves/signing-lab">github.com/davidgroves/signing-lab</a> ·
   Source: <a href="REPORT.md">REPORT.md</a> · Battery matrix: <a href="RESULTS.html">RESULTS.html</a> ·
   Regenerate with <code>python3 COMMON/scripts/make-report-html.py</code>
 </footer>

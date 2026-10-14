@@ -1,7 +1,7 @@
 # BIND bump-in-the-wire signer: mid-sign transfers
 
 **Date:** 2026-10-14  
-**Lab:** this repository (`UNSIGNED PRIMARY → SIGNER → DISTRIBUTION`)  
+**Lab:** [github.com/davidgroves/signing-lab](https://github.com/davidgroves/signing-lab) (`UNSIGNED PRIMARY → SIGNER → DISTRIBUTION`)  
 **BIND under test:** `9.20.29` (`named -V` id `c3d4465`)  
 **BIND source:** [isc-projects/bind9](https://gitlab.isc.org/isc-projects/bind9) tag `v9.20.29` / commit `c3d4465`  
 **Knot under test:** `3.6.1` (`knotc` in lab containers; image `cznic/knot` via `KNOT_TAG=latest`)  

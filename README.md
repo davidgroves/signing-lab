@@ -1,5 +1,7 @@
 # DNSSEC BITW resign labs
 
+Published report: **https://davidgroves.github.io/signing-lab/**
+
 Compare how **BIND** and **Knot DNS** behave as bump-in-the-wire signers across
 primary → signer → distribution topology combinations:
 
@@ -42,7 +44,7 @@ ZONESIZE=10 MODES=nsec ./run-all.sh BIND-BIND-KNOT
 
 - [USAGE.md](USAGE.md) — clean / run / results
 - `RESULTS.html` — latest battery summary per stack (`./make-results-html.sh`, also end of `./run-all.sh`)
-- [REPORT.html](REPORT.html) — definitive battery analysis + SVG timelines; source [REPORT.md](REPORT.md) (`python3 COMMON/scripts/make-report-html.py`)
+- [REPORT.html](https://davidgroves.github.io/signing-lab/) — definitive battery analysis + SVG timelines ([local](REPORT.html); source [REPORT.md](REPORT.md); `python3 COMMON/scripts/make-report-html.py`)
 - Per-stack READMEs under each topology directory
 
 ## Prerequisites

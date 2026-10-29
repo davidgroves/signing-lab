@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knot `dnssec-validation`: ZSK withdraw never reaches clients</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0d1117;
+    --ink: #e6edf3;
+    --muted: #9aa7b5;
+    --card: #161b22;
+    --line: #30363d;
+    --accent: #58a6ff;
+    --warn: #d29922;
+    --bad: #f85149;
+    --ok: #3fb950;
+    --code-bg: #010409;
+    --code-ink: #e6edf3;
+    --code-inline: #21262d;
+    --th: #21262d;
+    --quote-bg: #2a1f0a;
+    --quote-ink: #e3b341;
+    --ok-bg: #0d2818;
+    --ok-border: #238636;
+    --bad-bg: #2d1214;
+    --bad-border: #da3633;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font: 17px/1.55 "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 80% 50% at 10% 0%, #12203a 0%, transparent 55%),
+      radial-gradient(ellipse 60% 40% at 90% 10%, #0f2a24 0%, transparent 50%),
+      var(--bg);
+  }
+  .wrap { max-width: 54rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  header.hero {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  h1 {
+    font-size: clamp(1.6rem, 3.5vw, 2.15rem);
+    line-height: 1.2;
+    margin: 0 0 1rem;
+    letter-spacing: -0.02em;
+    color: #f0f6fc;
+  }
+  .meta { display: grid; gap: 0.35rem; color: var(--muted); font-size: 0.95rem; }
+  .meta a { color: var(--accent); }
+  h2 {
+    font-size: 1.35rem;
+    margin: 2.4rem 0 0.85rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--line);
+    color: #f0f6fc;
+  }
+  h3 { font-size: 1.1rem; margin: 1.5rem 0 0.6rem; color: #e6edf3; }
+  h4 { font-size: 1rem; margin: 1.2rem 0 0.5rem; color: #e6edf3; }
+  p, li { max-width: 70ch; }
+  blockquote {
+    margin: 1rem 0;
+    padding: 0.85rem 1.1rem;
+    border-left: 4px solid var(--warn);
+    background: var(--quote-bg);
+    color: var(--quote-ink);
+  }
+  blockquote p { margin: 0; }
+  a { color: var(--accent); }
+  code, pre {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.86em;
+  }
+  code {
+    background: var(--code-inline);
+    color: #ffa657;
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    line-height: 1.45;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin: 1rem 0 1.4rem;
+    background: var(--card);
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 0.45rem 0.55rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--th); color: #f0f6fc; }
+  td strong { color: var(--bad); }
+  .fig {
+    margin: 1.4rem 0 1.8rem;
+    padding: 1rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .fig svg { display: block; width: 100%; height: auto; max-width: 100%; }
+  .fig figcaption {
+    margin-top: 0.75rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+    max-width: none;
+  }
+  .callout {
+    margin: 1rem 0;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+  }
+  .callout.ok { border-color: var(--ok-border); background: var(--ok-bg); color: #7ee787; }
+  .callout.bad { border-color: var(--bad-border); background: var(--bad-bg); color: #ff7b72; }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin: 1.5rem 0;
+  }
+  .toc strong { display: block; margin-bottom: 0.4rem; color: #f0f6fc; }
+  .toc ol { margin: 0; padding-left: 1.3rem; }
+  .toc a { text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .badge {
+    display: inline-block;
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+  }
+  .badge.ok { color: var(--ok); background: var(--ok-bg); border: 1px solid var(--ok-border); }
+  .badge.bad { color: var(--bad); background: var(--bad-bg); border: 1px solid var(--bad-border); }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  @media print {
+    :root {
+      color-scheme: light;
+      --bg: #fff; --ink: #111; --muted: #444; --card: #fff; --line: #ccc;
+      --accent: #06c; --code-bg: #f4f4f4; --code-ink: #111; --code-inline: #eee; --th: #f0f0f0;
+    }
+    body { background: #fff; color: #111; }
+    .fig { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <h1>Knot `dnssec-validation`: ZSK withdraw never reaches clients</h1>
+  <div class="meta"><div><strong>Date:</strong> 2026-10-29</div><div><strong>Lab:</strong> <a href="https://github.com/davidgroves/signing-lab">github.com/davidgroves/signing-lab</a> — stack <a href="BIND-KNOT-manualsigning/"><code>BIND-KNOT-manualsigning/</code></a></div><div><strong>Companion reports:</strong> mid-sign BITW — <a href="REPORT.md">REPORT.md</a>; key-policy orphans — <a href="REPORT-KEY-POLICY.md">REPORT-KEY-POLICY.md</a></div><div><strong>BIND under test:</strong> <code>9.20.x</code> (image <code>BIND_TAG=9.20</code>); <strong>no</strong> <code>dnssec-policy</code> / inline-signing on this stack</div><div><strong>Knot under test:</strong> <code>3.6.1</code> (<code>cznic/knot</code> / <code>KNOT_TAG=latest</code>)</div><div><strong>Knot source cited below:</strong> tag <a href="https://github.com/CZ-NIC/knot/tree/v3.6.1"><code>v3.6.1</code></a> (<code>15a5f7a</code>)</div><div><strong>Definitive runs:</strong></div></div>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#executive-summary">Executive summary</a></li><li><a href="#topology">Topology</a></li><li><a href="#what-the-lab-observed">What the lab observed</a></li><li><a href="#why-this-works-in-the-knot-codebase">Why this works in the Knot codebase</a></li><li><a href="#relation-to-the-other-reports">Relation to the other reports</a></li><li><a href="#reproduce">Reproduce</a></li>
+  </ol>
+</nav>
+
+<h2 id="executive-summary">Executive summary</h2>
+
+<figure class="fig" aria-labelledby="fig-contrast-cap">
+<svg viewBox="0 0 760 280" role="img" aria-label="BIND publishes partial signatures per quantum; Knot signs then commits once">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#8b949e"/>
+    </marker>
+  </defs>
+  <rect x="20" y="20" width="340" height="240" rx="8" fill="#152238" stroke="#388bfd"/>
+  <text x="40" y="48" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#58a6ff">BIND inline-signing</text>
+  <text x="40" y="70" font-family="monospace" font-size="11" fill="#8b949e">zone_sign() quantum loop</text>
+  <rect x="50" y="95" width="70" height="36" rx="4" fill="#1d4ed8"/><text x="85" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">Q1</text>
+  <rect x="140" y="95" width="70" height="36" rx="4" fill="#2563eb"/><text x="175" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">Q2</text>
+  <rect x="230" y="95" width="70" height="36" rx="4" fill="#3b82f6"/><text x="265" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">Q3…</text>
+  <path d="M85 131 v28" stroke="#f85149" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M175 131 v28" stroke="#f85149" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M265 131 v28" stroke="#f85149" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="40" y="185" font-family="Georgia, serif" font-size="13" fill="#f85149">commit + NEEDNOTIFY</text>
+  <text x="40" y="205" font-family="Georgia, serif" font-size="13" fill="#f85149">per quantum → half-signed AXFR</text>
+  <rect x="50" y="220" width="270" height="24" rx="3" fill="#3d1517" stroke="#f85149"/>
+  <text x="185" y="236" text-anchor="middle" font-family="monospace" font-size="11" fill="#ff7b72">lab: 24× PARTLY_SIGNED FAIL</text>
+  <rect x="400" y="20" width="340" height="240" rx="8" fill="#12261f" stroke="#3fb950"/>
+  <text x="420" y="48" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#3fb950">Knot on-secondary</text>
+  <text x="420" y="70" font-family="monospace" font-size="11" fill="#8b949e">refresh finalize</text>
+  <rect x="430" y="95" width="100" height="36" rx="4" fill="#8b949e"/><text x="480" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">inbound XFR</text>
+  <path d="M530 113 H560" stroke="#5a6570" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="560" y="95" width="140" height="36" rx="4" fill="#0f766e"/><text x="630" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">sign entire update</text>
+  <path d="M630 131 v28" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="545" y="165" width="170" height="36" rx="4" fill="#059669"/><text x="630" y="187" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">zone_update_commit</text>
+  <text x="420" y="225" font-family="Georgia, serif" font-size="13" fill="#3fb950">NOTIFY only after commit</text>
+  <rect x="430" y="235" width="270" height="18" rx="3" fill="#123526" stroke="#3fb950"/>
+  <text x="565" y="248" text-anchor="middle" font-family="monospace" font-size="11" fill="#7ee787">lab: 28/28 FULLY_SIGNED</text>
+</svg>
+<figcaption id="fig-contrast-cap">Figure 1. Measured publication models — BIND commits/notifies per signing quantum; Knot signs then commits once.</figcaption>
+</figure>
+
+<p>Removing the <strong>ZSK DNSKEY</strong> from an otherwise still-signed zone (RRSIGs left intact) produces a classic <strong>orphan-RRSIG</strong> hazard: validating resolvers would see signatures whose keytag is absent from DNSKEY.</p>
+<p>This stack puts that broken serial on a <strong>BIND primary</strong> that does <strong>not</strong> re-sign, and a <strong>Knot secondary</strong> with <code>dnssec-validation: on</code>. Knot <strong>receives</strong> the IXFR/AXFR for the bad serial, <strong>fails DNSSEC validation before <code>zone_switch_contents</code></strong>, discards the update, and <strong>keeps serving the last good serial</strong>. Lab polls never saw the no-ZSK serial on distribution AXFR.</p>
+<table><thead><tr>
+<th>Serial</th>
+<th>Zone state</th>
+<th>BIND primary</th>
+<th>Knot distribution</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>1</strong></td>
+<td>KSK + ZSK, fully signed</td>
+<td>serves</td>
+<td><strong>serves</strong> (held through withdraw)</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td>ZSK DNSKEY removed; orphan RRSIGs (keytag 59678)</td>
+<td>serves</td>
+<td><strong>never</strong></td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td>Offline <code>dnssec-signzone</code> restore (same keys)</td>
+<td>serves</td>
+<td><strong>serves</strong> (accepted immediately)</td>
+</tr>
+</tbody></table>
+<p>Verdict: <strong>PASS</strong> — Knot never served no-ZSK serial 2; kept serial 1 for ≥60 s; then accepted restored serial 3.</p>
+<h2 id="topology">Topology</h2>
+<p>Not the three-box BITW layout. BIND is a dumb primary for a <strong>pre-signed</strong> zone file:</p>
+<pre><code>  offline dnssec-signzone (NSEC3, KSK+ZSK)
+              |
+              v
+  BIND primary  --IXFR/AXFR--&gt;  Knot distribution
+  (ixfr-from-differences)       dnssec-signing: off
+  no inline-signing             dnssec-validation: on</code></pre>
+<h3 id="proof-target-clean-apex-zsk-still-required-elsewhere">Proof target: clean apex, ZSK still required elsewhere</h3>
+<p>With a normal KSK/ZSK split, simply deleting the ZSK DNSKEY (or stripping apex ZSK RRSIGs) makes <strong>apex <code>NS</code>/<code>SOA</code> fail first</strong> — that does <strong>not</strong> isolate “other records still need the ZSK.”</p>
+<p>Knot’s validator, however, loads DNSKEYs with <strong><code>is_zsk = true</code> for every key</strong> (<code>src/knot/dnssec/kasp/kasp_zone.c</code>), so a <strong>KSK can validate apex zone data</strong> after the ZSK is gone. That lets us build a fair IXFR:</p>
+<ol><li>Serial <strong>1</strong>: normal KSK+ZSK NSEC3 zone.</li><li>Serial <strong>2</strong>: re-sign the zone with <strong>KSK only</strong> (<code>dnssec-signzone -S -z</code>); then replace RRSIGs on <code>www</code>/<code>app</code>/<code>ns1</code>/<code>txt1</code> with the <strong>old ZSK</strong> signatures (ZSK absent from DNSKEY). Apex + NSEC3 stay KSK-valid (<strong>0</strong> apex orphans).</li><li>Knot must reject serial 2; validation hint should be a <strong>non-apex</strong> name (lab: <code>app.manual.test.example. A</code>).</li></ol>
+<p>Script: <a href="BIND-KNOT-manualsigning/scripts/scenario-zsk-withdraw-clean-apex-ixfr.sh"><code>scenario-zsk-withdraw-clean-apex-ixfr.sh</code></a> — <strong>PASS</strong> <code>20261029T164827Z-…-PASS</code> (apex orphan=0, non-apex orphan=4; never served serial 2; restored serial 3).</p>
+<h3 id="related-variants">Related variants</h3>
+<table><thead><tr>
+<th>Script</th>
+<th>Primary hazard</th>
+<th>Typical Knot hint</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="BIND-KNOT-manualsigning/scripts/scenario-zsk-withdraw-ixfr.sh"><code>…-ixfr.sh</code></a></td>
+<td>Drop ZSK DNSKEY; leave all ZSK RRSIGs</td>
+<td>apex <code>NS</code> (orphan)</td>
+</tr>
+<tr>
+<td><a href="BIND-KNOT-manualsigning/scripts/scenario-zsk-withdraw-apex-strip-ixfr.sh"><code>…-apex-strip-ixfr.sh</code></a></td>
+<td>Drop ZSK + apex ZSK RRSIGs; non-apex orphans linger</td>
+<td>apex <code>NS</code> (<strong>unsigned</strong>)</td>
+</tr>
+<tr>
+<td><a href="BIND-KNOT-manualsigning/scripts/scenario-zsk-withdraw-clean-apex-ixfr.sh"><code>…-clean-apex-ixfr.sh</code></a></td>
+<td>KSK-clean apex; ZSK orphans only on non-apex</td>
+<td><strong><code>app … A</code></strong> (non-apex)</td>
+</tr>
+</tbody></table>
+<p><code>nsupdate</code> is deliberately avoided: on a DNSSEC-signed zone BIND treats updates as secure and would try to maintain RRSIGs — the opposite of this hazard.</p>
+<h2 id="what-the-lab-observed">What the lab observed</h2>
+<p>From <code>after-watch/distribution.log</code> / <code>after-restore/distribution.log</code> (run <code>20261029T153750Z</code>):</p>
+<pre><code># good load
+AXFR incoming … remote serial 1
+DNSSEC, validation successful, checked RRSIGs 25
+refresh … serial none -&gt; 1
+
+# ZSK withdrawn on primary (serial 2)
+notify … serial 2
+IXFR incoming … remote serial 2
+DNSSEC, incremental validation failed (no valid signature for a record)
+DNSSEC, validation hint: manual.test.example. NS
+AXFR incoming … remote serial 2          # fallback after IXFR reject
+DNSSEC, validation failed (no valid signature for a record)
+DNSSEC, validation hint: manual.test.example. NS
+AXFR outgoing … serial 1                 # clients still get the good zone
+
+# restore (serial 3)
+AXFR incoming … remote serial 3
+DNSSEC, validation successful, checked RRSIGs 25
+refresh … serial 1 -&gt; 3</code></pre>
+<p>Primary after withdraw: DNSKEY keytags <strong>[29443]</strong> (KSK only); <strong>12</strong> orphan RRSIGs still keyed <strong>59678</strong> (ex-ZSK). Knot never published that view.</p>
+<h2 id="why-this-works-in-the-knot-codebase">Why this works in the Knot codebase</h2>
+<h3 id="validation-treats-every-dnskey-as-a-zsk">Validation treats every DNSKEY as a ZSK</h3>
+<p>When building keys from the candidate zone for validation (<code>kasp_zone_keys_from_rr</code>):</p>
+<pre><code>zone-&gt;keys[i].is_ksk = (knot_dnskey_flags(zkey) &amp; DNSKEY_FLAGS_KSK) == DNSKEY_FLAGS_KSK;
+zone-&gt;keys[i].is_zsk = true; // any KSK might behave like ZSK … for validation</code></pre>
+<p>So after a clean ZSK withdrawal, apex <code>NS</code>/<code>SOA</code>/NSEC3 signed by the remaining KSK still verify. RRSIGs whose <strong>keytag is absent</strong> from DNSKEY (the lingering ZSK on <code>app</code>/<code>www</code>/…) fail <code>knot_validate_rrsigs()</code> → <code>KNOT_DNSSEC_ENOSIG</code>. That is the clean-apex proof.</p>
+<h3 id="gate-sits-before-publish">Gate sits before publish</h3>
+<p>Knot’s documented behaviour matches the code path used on every zone update (load, IXFR, AXFR):</p>
+<blockquote><p>When the validation fails, the zone being loaded or update being applied is cancelled with an error, and either none or previous zone state is published.  <br>— <code>doc/reference.rst</code>, <code>zone_dnssec-validation</code> (<code>v3.6.1</code>)</p></blockquote>
+<h3 id="1-gate-sits-before-the-contents-switch">1. Gate sits *before* the contents switch</h3>
+<p><code>zone_update_commit()</code> (<code>src/knot/updates/zone-update.c</code>) reads <code>C_DNSSEC_VALIDATION</code>. If on, it calls <code>knot_dnssec_validate_zone()</code> and, on any error, <strong><code>discard_adds_tree(update)</code> and return</strong> — never reaching <code>zone_switch_contents()</code>:</p>
+<pre><code>val = conf_zone_get(conf, C_DNSSEC_VALIDATION, update-&gt;zone-&gt;name);
+if (conf_bool(&amp;val)) {
+    validation_conf_t val_conf = {
+        .conf = conf,
+        .incremental = update-&gt;flags &amp; UPDATE_INCREMENTAL,
+        .fast = false,
+        .log_plan = true,
+    };
+    ret = knot_dnssec_validate_zone(update, &amp;val_conf);
+    if (ret != KNOT_EOK) {
+        discard_adds_tree(update);
+        return ret;
+    }
+}
+/* … journal … */
+/* Switch zone contents. */
+old_contents = zone_switch_contents(update-&gt;zone, update-&gt;new_cont);</code></pre>
+<p>IXFR finalization in <code>refresh.c</code> only publishes after a successful <code>zone_update_commit()</code>. A validation failure there leaves the previous <code>zone-&gt;contents</code> (serial 1) answering queries — exactly the outgoing <code>AXFR … serial 1</code> lines above.</p>
+<h3 id="2-validator-keys-come-from-the-candidate-dnskey-rrset">2. Validator keys come from the *candidate* DNSKEY RRset</h3>
+<p><code>knot_dnssec_validate_zone()</code> (<code>src/knot/dnssec/zone-events.c</code>) builds a validation context from <strong><code>update-&gt;new_cont</code></strong>, not from KASP private keys and not from the old zone:</p>
+<pre><code>ret = kdnssec_validation_ctx(val_conf-&gt;conf, &amp;ctx, update-&gt;new_cont,
+                             val_conf-&gt;threads);
+/* … */
+ctx.validation_mode = true;   /* set inside kdnssec_validation_ctx */</code></pre>
+<p><code>kasp_zone_from_contents()</code> loads whatever DNSKEYs are in the <strong>new</strong> apex. After the withdraw IXFR, that set is <strong>KSK only</strong>. RRSIGs still carry keytag <strong>59678</strong> (the removed ZSK).</p>
+<h3 id="3-failure-mode-is-knot-dnssec-enosig-no-valid-signature-for-a-record">3. Failure mode is <code>KNOT_DNSSEC_ENOSIG</code> (“no valid signature for a record”)</h3>
+<p>In validation mode, <code>sign_node_rrsets()</code> (<code>src/knot/dnssec/zone-sign.c</code>) does not sign; it calls <code>knot_validate_rrsigs()</code>:</p>
+<ul><li>For apex <code>NS</code> / most RRtypes, <code>key_used()</code> requires a <strong>ZSK</strong> (<code>is_zsk</code>).</li><li>With only the KSK left in the keyset, no usable key matches the ZSK RRSIGs.</li><li><code>knot_validate_rrsigs()</code> returns <strong><code>KNOT_DNSSEC_ENOSIG</code></strong> when no valid signature exists for a required key — the same string Knot logs (<code>src/libknot/error.c</code>).</li></ul>
+<p>That matches the lab hint: <code>validation hint: manual.test.example. NS</code>.</p>
+<p>Doc checklist for the same check: *“Every zone RRSet is correctly signed by at least one present DNSKEY.”*</p>
+<h3 id="4-dnskey-change-forces-a-full-walk-even-on-an-incremental-update">4. DNSKEY change forces a full walk even on an “incremental” update</h3>
+<p><code>knot_zone_sign_update()</code> notices apex DNSKEY / NSEC3PARAM changes via <code>apex_dnssec_changed()</code> and falls through to a <strong>full</strong> <code>knot_zone_sign()</code> even when <code>validation_conf.incremental</code> is true (IXFR). So removing the ZSK is not a narrow incremental pass that could miss orphans elsewhere in the zone — the whole candidate contents are checked. The log still prefixes *“incremental ”* because that flag reflects the update type, not the scope of the crypto walk.</p>
+<p>After IXFR reject, refresh falls back to AXFR; full validation fails the same way; serial 2 still never switches in.</p>
+<h3 id="5-restore-succeeds-for-the-complementary-reason">5. Restore succeeds for the complementary reason</h3>
+<p>Serial <strong>3</strong> is produced by offline <code>dnssec-signzone</code> with the <strong>same</strong> KSK+ZSK. Candidate DNSKEY again contains keytag 59678; RRSIGs verify; <code>zone_update_commit</code> switches <code>1 → 3</code>. Lab: <code>validation successful, checked RRSIGs 25</code> then distribution AXFR <code>FULLY_SIGNED serial=3</code>.</p>
+<h2 id="relation-to-the-other-reports">Relation to the other reports</h2>
+<table><thead><tr>
+<th>Report</th>
+<th>Hazard</th>
+<th>Gate</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="REPORT.md">REPORT.md</a></td>
+<td>BIND BITW mid-sign → <code>PARTLY_SIGNED</code></td>
+<td>Knot validate-on → often <code>AXFR_UNAVAILABLE</code> while BIND still publishes junk</td>
+</tr>
+<tr>
+<td><a href="REPORT-KEY-POLICY.md">REPORT-KEY-POLICY.md</a></td>
+<td>Same-alg ZSK length change → orphan RRSIGs during slow re-sign</td>
+<td>Same Knot gate in BBK <code>scenario-key-policy-gate.sh</code></td>
+</tr>
+<tr>
+<td><strong>This report</strong></td>
+<td>Explicit ZSK DNSKEY withdraw <strong>without</strong> re-sign</td>
+<td>Knot keeps last good serial; primary still serves orphans</td>
+</tr>
+</tbody></table>
+<p>This stack isolates the <strong>distribution gate</strong> with no middle signer and no BIND signing at all: the primary is *supposed* to publish the broken serial; Knot is the only safety rail.</p>
+<h2 id="reproduce">Reproduce</h2>
+<pre><code>cd BIND-KNOT-manualsigning
+./clean.sh
+./scripts/scenario-zsk-withdraw-ixfr.sh</code></pre>
+<p>PASS criterion (scenario): Knot never serves <code>serial_bad</code>; then accepts <code>serial_restored</code> with ZSK present; validation reject logged; good serial kept during the withdraw window.</p>
+
+<footer>
+  Repository: <a href="https://github.com/davidgroves/signing-lab">github.com/davidgroves/signing-lab</a> ·
+  Source: <a href="REPORT-ZSK-WITHDRAW.md">REPORT-ZSK-WITHDRAW.md</a> ·
+  Battery matrix: <a href="RESULTS.html">RESULTS.html</a>
+  · Related: <a href="REPORT.html">mid-sign transfers</a> · <a href="REPORT-KEY-POLICY.html">key length / algorithm</a> · <a href="REPORT-ZSK-WITHDRAW.html">ZSK withdraw / Knot gate</a> ·
+  Regenerate with <code>python3 COMMON/scripts/make-report-html.py</code>
+</footer>
+</div>
+</body>
+</html>

@@ -12,15 +12,16 @@ resolve_target() {
 		knot|KNOT|KNOT-KNOT-KNOT) echo KNOT-KNOT-KNOT ;;
 		bbk|BBK|BIND-BIND-KNOT) echo BIND-BIND-KNOT ;;
 		bkb|BKB|BIND-KNOT-BIND) echo BIND-KNOT-BIND ;;
+		bkms|BKMS|BIND-KNOT-manualsigning) echo BIND-KNOT-manualsigning ;;
 		all|"") echo all ;;
 		*) return 1 ;;
 	esac
 }
 
-ALL_STACKS=(BIND-BIND-BIND BIND-BIND-KNOT BIND-KNOT-BIND KNOT-KNOT-KNOT)
+ALL_STACKS=(BIND-BIND-BIND BIND-BIND-KNOT BIND-KNOT-BIND KNOT-KNOT-KNOT BIND-KNOT-manualsigning)
 
 resolved="$(resolve_target "$TARGET")" || {
-	echo "Usage: $0 [bind|knot|bbk|bkb|BIND-BIND-BIND|BIND-BIND-KNOT|BIND-KNOT-BIND|KNOT-KNOT-KNOT|all]"
+	echo "Usage: $0 [bind|knot|bbk|bkb|bkms|BIND-BIND-BIND|BIND-BIND-KNOT|BIND-KNOT-BIND|KNOT-KNOT-KNOT|BIND-KNOT-manualsigning|all]"
 	exit 2
 }
 

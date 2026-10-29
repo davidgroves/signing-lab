@@ -17,6 +17,7 @@ Directories are named **PRIMARY-SIGNER-DISTRIBUTION**:
 | [`BIND-BIND-KNOT/`](BIND-BIND-KNOT/) | BIND signer, Knot distribution (`dnssec-validation` off + on) |
 | [`BIND-KNOT-BIND/`](BIND-KNOT-BIND/) | Knot signer, BIND distribution |
 | [`KNOT-KNOT-KNOT/`](KNOT-KNOT-KNOT/) | all Knot |
+| [`BIND-KNOT-manualsigning/`](BIND-KNOT-manualsigning/) | BIND hand-signed primary → Knot (`dnssec-validation: on`); ZSK withdraw via IXFR |
 | [`COMMON/`](COMMON/) | Shared zone generator, AXFR coverage checker, starters |
 
 ## Quick start
@@ -27,8 +28,9 @@ Directories are named **PRIMARY-SIGNER-DISTRIBUTION**:
 ./run-all.sh knot                 # KNOT-KNOT-KNOT
 ./run-all.sh bbk                  # BIND-BIND-KNOT
 ./run-all.sh bkb                  # BIND-KNOT-BIND
-./run-all.sh all                  # all four stacks
+./run-all.sh all                  # all four mid-sign stacks
 ZONESIZE=10 MODES=nsec ./run-all.sh BIND-BIND-KNOT
+cd BIND-KNOT-manualsigning && ./scripts/scenario-zsk-withdraw-ixfr.sh
 ```
 
 ## Host ports
@@ -39,12 +41,15 @@ ZONESIZE=10 MODES=nsec ./run-all.sh BIND-BIND-KNOT
 | KNOT-KNOT-KNOT | 25353 | 25354 | 25355 | `172.30.54.0/24` |
 | BIND-BIND-KNOT | 35353 | 35354 | 35355 | `172.30.55.0/24` |
 | BIND-KNOT-BIND | 45353 | 45354 | 45355 | `172.30.56.0/24` |
+| BIND-KNOT-manualsigning | 55353 | — | 55355 | `172.30.57.0/24` |
 
 ## Docs
 
 - [USAGE.md](USAGE.md) — clean / run / results
 - `RESULTS.html` — latest battery summary per stack (`./make-results-html.sh`, also end of `./run-all.sh`)
 - [REPORT.html](https://davidgroves.github.io/signing-lab/) — definitive battery analysis + SVG timelines ([local](REPORT.html); source [REPORT.md](REPORT.md); `python3 COMMON/scripts/make-report-html.py`)
+- [REPORT-KEY-POLICY.html](REPORT-KEY-POLICY.html) — same-alg ZSK length change vs algorithm rollover ([source](REPORT-KEY-POLICY.md))
+- [REPORT-ZSK-WITHDRAW.html](REPORT-ZSK-WITHDRAW.html) — ZSK DNSKEY withdraw; Knot `dnssec-validation` keeps last good serial ([source](REPORT-ZSK-WITHDRAW.md))
 - Per-stack READMEs under each topology directory
 
 ## Prerequisites

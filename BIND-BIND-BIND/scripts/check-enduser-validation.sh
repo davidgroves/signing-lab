@@ -1,0 +1,1 @@
+../../COMMON/scripts/check-enduser-validation.sh

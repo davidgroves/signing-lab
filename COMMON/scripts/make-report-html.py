@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import html
 import re
+import sys
 from pathlib import Path
 
 CSS = """
@@ -560,12 +561,14 @@ def md_to_html(md: str) -> tuple[str, list[tuple[str, str]]]:
     return "\n".join(out), toc
 
 
-def build(md_path: Path, out_path: Path) -> None:
+def build(md_path: Path, out_path: Path, *, footer_extra: str = "") -> None:
     md = md_path.read_text(encoding="utf-8")
-    # hero meta from first lines
-    title = "BIND bump-in-the-wire signer: mid-sign transfers"
+    title = "Report"
     meta_lines: list[str] = []
-    for line in md.splitlines()[1:]:
+    for i, line in enumerate(md.splitlines()):
+        if i == 0 and line.startswith("# "):
+            title = line[2:].strip()
+            continue
         if line.startswith("#"):
             break
         if line.startswith("**") and ":**" in line:
@@ -576,6 +579,7 @@ def build(md_path: Path, out_path: Path) -> None:
     body, toc = md_to_html(md)
     toc_html = "".join(f'<li><a href="#{html.escape(s)}">{html.escape(t)}</a></li>' for s, t in toc)
     meta_html = "".join(f"<div>{inline(m.strip())}</div>" for m in meta_lines)
+    src_name = md_path.name
 
     doc = f"""<!DOCTYPE html>
 <html lang="en">
@@ -603,7 +607,9 @@ def build(md_path: Path, out_path: Path) -> None:
 
 <footer>
   Repository: <a href="https://github.com/davidgroves/signing-lab">github.com/davidgroves/signing-lab</a> ·
-  Source: <a href="REPORT.md">REPORT.md</a> · Battery matrix: <a href="RESULTS.html">RESULTS.html</a> ·
+  Source: <a href="{html.escape(src_name)}">{html.escape(src_name)}</a> ·
+  Battery matrix: <a href="RESULTS.html">RESULTS.html</a>
+  {footer_extra}·
   Regenerate with <code>python3 COMMON/scripts/make-report-html.py</code>
 </footer>
 </div>
@@ -618,10 +624,19 @@ def main() -> int:
     ap.add_argument("--root", type=Path, default=None)
     args = ap.parse_args()
     root = args.root.resolve() if args.root else Path(__file__).resolve().parents[2]
-    md = root / "REPORT.md"
-    out = root / "REPORT.html"
-    build(md, out)
-    print(f"Wrote {out}")
+    cross = (
+        '· Related: <a href="REPORT.html">mid-sign transfers</a> · '
+        '<a href="REPORT-KEY-POLICY.html">key length / algorithm</a> · '
+        '<a href="REPORT-ZSK-WITHDRAW.html">ZSK withdraw / Knot gate</a> '
+    )
+    for name in ("REPORT.md", "REPORT-KEY-POLICY.md", "REPORT-ZSK-WITHDRAW.md"):
+        md = root / name
+        if not md.is_file():
+            print(f"skip missing {md}", file=sys.stderr)
+            continue
+        out = md.with_suffix(".html")
+        build(md, out, footer_extra=cross)
+        print(f"Wrote {out}")
     return 0
 
 

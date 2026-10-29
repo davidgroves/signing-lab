@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BIND dnssec-policy: ZSK key-length change vs algorithm rollover</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0d1117;
+    --ink: #e6edf3;
+    --muted: #9aa7b5;
+    --card: #161b22;
+    --line: #30363d;
+    --accent: #58a6ff;
+    --warn: #d29922;
+    --bad: #f85149;
+    --ok: #3fb950;
+    --code-bg: #010409;
+    --code-ink: #e6edf3;
+    --code-inline: #21262d;
+    --th: #21262d;
+    --quote-bg: #2a1f0a;
+    --quote-ink: #e3b341;
+    --ok-bg: #0d2818;
+    --ok-border: #238636;
+    --bad-bg: #2d1214;
+    --bad-border: #da3633;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font: 17px/1.55 "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 80% 50% at 10% 0%, #12203a 0%, transparent 55%),
+      radial-gradient(ellipse 60% 40% at 90% 10%, #0f2a24 0%, transparent 50%),
+      var(--bg);
+  }
+  .wrap { max-width: 54rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  header.hero {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  h1 {
+    font-size: clamp(1.6rem, 3.5vw, 2.15rem);
+    line-height: 1.2;
+    margin: 0 0 1rem;
+    letter-spacing: -0.02em;
+    color: #f0f6fc;
+  }
+  .meta { display: grid; gap: 0.35rem; color: var(--muted); font-size: 0.95rem; }
+  .meta a { color: var(--accent); }
+  h2 {
+    font-size: 1.35rem;
+    margin: 2.4rem 0 0.85rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--line);
+    color: #f0f6fc;
+  }
+  h3 { font-size: 1.1rem; margin: 1.5rem 0 0.6rem; color: #e6edf3; }
+  h4 { font-size: 1rem; margin: 1.2rem 0 0.5rem; color: #e6edf3; }
+  p, li { max-width: 70ch; }
+  blockquote {
+    margin: 1rem 0;
+    padding: 0.85rem 1.1rem;
+    border-left: 4px solid var(--warn);
+    background: var(--quote-bg);
+    color: var(--quote-ink);
+  }
+  blockquote p { margin: 0; }
+  a { color: var(--accent); }
+  code, pre {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.86em;
+  }
+  code {
+    background: var(--code-inline);
+    color: #ffa657;
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    line-height: 1.45;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin: 1rem 0 1.4rem;
+    background: var(--card);
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 0.45rem 0.55rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--th); color: #f0f6fc; }
+  td strong { color: var(--bad); }
+  .fig {
+    margin: 1.4rem 0 1.8rem;
+    padding: 1rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .fig svg { display: block; width: 100%; height: auto; max-width: 100%; }
+  .fig figcaption {
+    margin-top: 0.75rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+    max-width: none;
+  }
+  .callout {
+    margin: 1rem 0;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+  }
+  .callout.ok { border-color: var(--ok-border); background: var(--ok-bg); color: #7ee787; }
+  .callout.bad { border-color: var(--bad-border); background: var(--bad-bg); color: #ff7b72; }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    margin: 1.5rem 0;
+  }
+  .toc strong { display: block; margin-bottom: 0.4rem; color: #f0f6fc; }
+  .toc ol { margin: 0; padding-left: 1.3rem; }
+  .toc a { text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .badge {
+    display: inline-block;
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+  }
+  .badge.ok { color: var(--ok); background: var(--ok-bg); border: 1px solid var(--ok-border); }
+  .badge.bad { color: var(--bad); background: var(--bad-bg); border: 1px solid var(--bad-border); }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  @media print {
+    :root {
+      color-scheme: light;
+      --bg: #fff; --ink: #111; --muted: #444; --card: #fff; --line: #ccc;
+      --accent: #06c; --code-bg: #f4f4f4; --code-ink: #111; --code-inline: #eee; --th: #f0f0f0;
+    }
+    body { background: #fff; color: #111; }
+    .fig { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <h1>BIND dnssec-policy: ZSK key-length change vs algorithm rollover</h1>
+  <div class="meta"><div><strong>Date:</strong> 2026-10-22</div><div><strong>Lab:</strong> <a href="https://github.com/davidgroves/signing-lab">github.com/davidgroves/signing-lab</a> (<code>UNSIGNED PRIMARY → SIGNER → DISTRIBUTION</code>)</div><div><strong>Companion reports:</strong> mid-sign BITW transfers — <a href="REPORT.md">REPORT.md</a> / <a href="https://davidgroves.github.io/signing-lab/">REPORT.html</a>; Knot gate on explicit ZSK withdraw — <a href="REPORT-ZSK-WITHDRAW.md">REPORT-ZSK-WITHDRAW.md</a></div><div><strong>BIND under test:</strong> <code>9.20.x</code> (lab image <code>BIND_TAG=9.20</code>; analysis against tree at <code>/home/dwg/CODE/bind9</code>)</div><div><strong>Incident context:</strong> production BITW signer, policy <strong>name</strong> changed (<code>…-8-1024-…</code> → <code>…-8-2048-…</code>), longest zone TTL <strong>24 h</strong>, <code>max-zone-ttl: P2D</code> in the new policy</div></div>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#executive-summary">Executive summary</a></li><li><a href="#topology">Topology</a></li><li><a href="#what-happened-in-the-incident-model">What happened in the incident (model)</a></li><li><a href="#bind-code-path-keymgr-kasp-zone">BIND code path (keymgr / kasp / zone)</a></li><li><a href="#contrast-diagram">Contrast diagram</a></li><li><a href="#timing-model-incident-vs-lab">Timing model (incident vs lab)</a></li><li><a href="#safeguards-operational">Safeguards (operational)</a></li><li><a href="#lab-reproduction">Lab reproduction</a></li><li><a href="#relation-to-the-mid-sign-report">Relation to the mid-sign report</a></li>
+  </ol>
+</nav>
+
+<h2 id="executive-summary">Executive summary</h2>
+
+<figure class="fig" aria-labelledby="fig-contrast-cap">
+<svg viewBox="0 0 760 280" role="img" aria-label="BIND publishes partial signatures per quantum; Knot signs then commits once">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#8b949e"/>
+    </marker>
+  </defs>
+  <rect x="20" y="20" width="340" height="240" rx="8" fill="#152238" stroke="#388bfd"/>
+  <text x="40" y="48" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#58a6ff">BIND inline-signing</text>
+  <text x="40" y="70" font-family="monospace" font-size="11" fill="#8b949e">zone_sign() quantum loop</text>
+  <rect x="50" y="95" width="70" height="36" rx="4" fill="#1d4ed8"/><text x="85" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">Q1</text>
+  <rect x="140" y="95" width="70" height="36" rx="4" fill="#2563eb"/><text x="175" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">Q2</text>
+  <rect x="230" y="95" width="70" height="36" rx="4" fill="#3b82f6"/><text x="265" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">Q3…</text>
+  <path d="M85 131 v28" stroke="#f85149" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M175 131 v28" stroke="#f85149" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M265 131 v28" stroke="#f85149" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="40" y="185" font-family="Georgia, serif" font-size="13" fill="#f85149">commit + NEEDNOTIFY</text>
+  <text x="40" y="205" font-family="Georgia, serif" font-size="13" fill="#f85149">per quantum → half-signed AXFR</text>
+  <rect x="50" y="220" width="270" height="24" rx="3" fill="#3d1517" stroke="#f85149"/>
+  <text x="185" y="236" text-anchor="middle" font-family="monospace" font-size="11" fill="#ff7b72">lab: 24× PARTLY_SIGNED FAIL</text>
+  <rect x="400" y="20" width="340" height="240" rx="8" fill="#12261f" stroke="#3fb950"/>
+  <text x="420" y="48" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#3fb950">Knot on-secondary</text>
+  <text x="420" y="70" font-family="monospace" font-size="11" fill="#8b949e">refresh finalize</text>
+  <rect x="430" y="95" width="100" height="36" rx="4" fill="#8b949e"/><text x="480" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">inbound XFR</text>
+  <path d="M530 113 H560" stroke="#5a6570" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="560" y="95" width="140" height="36" rx="4" fill="#0f766e"/><text x="630" y="117" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">sign entire update</text>
+  <path d="M630 131 v28" stroke="#3fb950" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="545" y="165" width="170" height="36" rx="4" fill="#059669"/><text x="630" y="187" text-anchor="middle" font-family="monospace" font-size="11" fill="#fff">zone_update_commit</text>
+  <text x="420" y="225" font-family="Georgia, serif" font-size="13" fill="#3fb950">NOTIFY only after commit</text>
+  <rect x="430" y="235" width="270" height="18" rx="3" fill="#123526" stroke="#3fb950"/>
+  <text x="565" y="248" text-anchor="middle" font-family="monospace" font-size="11" fill="#7ee787">lab: 28/28 FULLY_SIGNED</text>
+</svg>
+<figcaption id="fig-contrast-cap">Figure 1. Measured publication models — BIND commits/notifies per signing quantum; Knot signs then commits once.</figcaption>
+</figure>
+
+<p>Changing only the <strong>RSA key length</strong> (same algorithm) under <code>dnssec-policy</code> is <strong>not</strong> a linked ZSK pre-publication rollover. BIND treats the old key as a <strong>policy mismatch</strong>, retires it immediately (<code>Inactive = now</code>, goal <code>HIDDEN</code>), and creates a <strong>new</strong> key <strong>without</strong> a Predecessor/Successor link. Without that link, the ZRRSIG→<code>OMNIPRESENT</code> timer <strong>skips <code>Dsgn</code> (sign delay)</strong>. Rule <strong><a href="https://www.nlnetlabs.nl/downloads/publications/satin2012-Schaeffer.pdf#page=5">(3f)</a></strong> then lets the old same-algorithm ZSK drop its ZRRSIG state as soon as the new ZSK is marked fully published — after roughly <strong><code>max-zone-ttl + zone-propagation-delay</code></strong>, not after a full-zone re-sign.</p>
+<p>When the old DNSKEY is removed, <code>zone_signwithkey(..., deleteit)</code> starts deleting old-keytag RRSIGs. On a large zone with slow incremental signing, that removal can happen <strong>while many RRsets still carry only the old keytag</strong>. Validating resolvers then see <strong>RRSIG keytag with no matching DNSKEY</strong> → <strong>BOGUS</strong>.</p>
+<p>A <strong>true algorithm change</strong> (e.g. RSASHA256 → ECDSAP256SHA256) hits the same “unmatched → retire” entry point, but rule <strong>(3f)</strong> is <strong>same-algorithm only</strong>. The new ZSK cannot vouch for the old algorithm’s ZRRSIG retirement, so the old ZSK cannot take that early exit. Old DNSKEY (and therefore old-alg RRSIGs) stay until a proper multi-algorithm transition completes — the contrast this lab is built to show.</p>
+<table><thead><tr>
+<th>Change</th>
+<th>Predecessor link?</th>
+<th><code>Dsgn</code> in ZRRSIG timer?</th>
+<th>Rule (3f) early exit?</th>
+<th>Orphan-RRSIG hazard</th>
+</tr></thead><tbody>
+<tr>
+<td>Same alg, length 1024→2048</td>
+<td>No (policy mismatch retire)</td>
+<td>Skipped</td>
+<td>Yes (new ZSK same alg)</td>
+<td><strong>Yes</strong> on large/slow BITW</td>
+</tr>
+<tr>
+<td>Alg 8→13 (new policy name)</td>
+<td>No (mismatch retire)</td>
+<td>Skipped for *new* key</td>
+<td><strong>No</strong> (different alg)</td>
+<td><strong>No</strong> (old DNSKEY retained)</td>
+</tr>
+</tbody></table>
+<p>Lab scenarios: BIND-BIND-BIND <code>scenario-key-policy-change.sh</code> with <code>ROLLOVER=size</code> (expect hazard) and <code>ROLLOVER=alg</code> (expect clean contrast); BIND-BIND-KNOT <code>scenario-key-policy-gate.sh</code> (NSEC3, Knot validate-on — PASS if distribution never serves invalid).</p>
+<p><strong>Lab confirmation (2026-10-22):</strong> <code>ROLLOVER=size</code> on a 10 MiB NSEC zone reproduced the hazard within ~20 s of the policy name switch — old ZSK left DNSKEY while RRSIGs still carried its keytag (<code>…-nsec-key-policy-size-FAIL</code>).</p>
+<h2 id="topology">Topology</h2>
+<p>Same BITW contract as the mid-sign report:</p>
+<pre><code>primary (unsigned)  --AXFR--&gt;  signer (dnssec-policy + inline-signing)
+                                      |
+                                      | AXFR/IXFR (must stay valid for DO=1 clients)
+                                      v
+                               distribution (secondary)</code></pre>
+<p>The production incident and the lab scenarios both put <strong>key policy on the signer</strong>, not on the unsigned primary.</p>
+<h2 id="what-happened-in-the-incident-model">What happened in the incident (model)</h2>
+<ol><li>Zone stable under policy A (RSA-SHA256 / algorithm 8, ZSK <strong>1024</strong>).</li><li>Operator switched the zone to policy B by <strong>changing the policy name</strong> (not an in-place edit of the same <code>dnssec-policy</code> block). New policy: algorithm 8, ZSK <strong>2048</strong>, <code>max-zone-ttl: P2D</code>.</li><li>Longest <strong>actual</strong> RRset TTL in the zone was <strong>24 h</strong>. BIND’s key-state timers still use the policy’s <strong><code>max-zone-ttl</code></strong> (here <strong>P2D</strong>), not the observed maximum TTL.</li><li>Within on the order of <strong>~48 h</strong> (<code>≈ max-zone-ttl</code> plus publish/propagation slop — not a 7-day sign-delay rollover), the <strong>1024-bit ZSK left the DNSKEY RRset</strong> while re-signing was still in progress.</li><li>NSEC3 chain churn looked alarming in logs/AXFR diffs; it was <strong>re-signing under the new key</strong>, not a separate NSEC3PARAM rollover.</li></ol>
+<pre><code>  policy A (alg8/1024)                 policy B (alg8/2048)
+         |                                      |
+         |  dns_kasp_key_match?  alg+length+role
+         |         |
+         |         +-- no match --&gt; keymgr_key_retire
+         |                            Inactive=now, goal=HIDDEN
+         |         +-- create new ZSK (no Predecessor)
+         v
+   old ZRRSIG still OMNIPRESENT
+   new ZSK: DNSKEY publish --&gt; ZRRSIG RUMOURED
+                |
+                |  transition_time(ZRRSIG-&gt;OMNIPRESENT):
+                |    + max-zone-ttl + zone-propagation-delay
+                |    + Dsgn  ONLY if Predecessor|Successor set
+                |         ^^^^^^^^ skipped here
+                v
+   new ZRRSIG OMNIPRESENT  --(3f)--&gt;  old ZRRSIG may go UNRETENTIVE
+                |
+                v
+   old DNSKEY removed  --&gt;  zone_signwithkey(deleteit)
+                |
+                +-- RRsets not yet re-signed: RRSIG keytag orphaned --&gt; BOGUS</code></pre>
+<h2 id="bind-code-path-keymgr-kasp-zone">BIND code path (keymgr / kasp / zone)</h2>
+<h3 id="policy-match-is-algorithm-and-length">Policy match is algorithm <strong>and</strong> length</h3>
+<pre><code>/* lib/dns/kasp.c — dns_kasp_key_match() */
+if (dst_key_alg(dkey-&gt;key) != dns_kasp_key_algorithm(key))
+    return false;
+if (dst_key_size(dkey-&gt;key) != dns_kasp_key_size(key))
+    return false;</code></pre>
+<p>A 1024-bit ZSK does <strong>not</strong> match a policy that asks for 2048. Same for algorithm mismatches. Unmatched keys are retired; the policy’s key slots are filled with <strong>new</strong> keys.</p>
+<h3 id="unmatched-immediate-retire-not-wait-for-lifetime">Unmatched → immediate retire (not “wait for lifetime”)</h3>
+<p><code>keymgr_key_retire()</code> sets goal <code>HIDDEN</code> and, if needed, <strong><code>Inactive = now</code></strong>. That is the opposite of a scheduled lifetime rollover, where the successor is created with a Predecessor link before the predecessor’s inactive time.</p>
+<h3 id="sign-delay-dsgn-is-gated-on-predecessor-successor">Sign delay (<code>Dsgn</code>) is gated on Predecessor/Successor</h3>
+<pre><code>/* lib/dns/keymgr.c — keymgr_transition_time(), DST_KEY_ZRRSIG → OMNIPRESENT */
+nexttime = sigtime + ttlsig + dns_kasp_zonepropagationdelay(kasp);
+/* Only add the sign delay Dsgn and retire-safety if
+ * there is an actual predecessor or successor key. */
+if (/* Predecessor or Successor present */) {
+    nexttime += signdelay + dns_kasp_retiresafety(kasp);
+}</code></pre>
+<p><code>signdelay</code> ≈ <code>signatures-validity − signatures-refresh</code> (often days in production). <strong>Unlinked</strong> keys omit it. The new ZSK can be marked ZRRSIG-<code>OMNIPRESENT</code> after <strong><code>max-zone-ttl + propagation</code> alone</strong> — even if the zone is nowhere near fully re-signed.</p>
+<h3 id="rule-3f-is-same-algorithm">Rule (3f) is same-algorithm</h3>
+<p>The labels (3a)–(3i) are the formal validity rules in Yuri Schaeffer, Benno Overeinder, and Matthijs Mekking, <a href="https://www.nlnetlabs.nl/downloads/publications/satin2012-Schaeffer.pdf#page=5">Flexible and Robust Key Rollover in DNSSEC</a> (NLnet Labs, SATIN 2012), page 5. Rule 3 covers signatures other than the DNSKEY RRSIG. Equation (3f) is its first alternative: some same-algorithm key has both its DNSKEY and its signatures omnipresent. The paper spells (3f)–(3i) out on <a href="https://www.nlnetlabs.nl/downloads/publications/satin2012-Schaeffer.pdf#page=6">page 6</a>. BIND implements them in <code>keymgr_have_rrsig()</code> and cites the paper from <code>keymgr.c</code> (equations (1), (2), and (3a)–(3i)). ISC restates the three rules, without these labels, in <a href="https://kb.isc.org/docs/dnssec-key-states">DNSSEC Key States</a>.</p>
+<p>In the 9.20.23 tree at <code>/home/dwg/CODE/bind9</code>, (3f) is <a href="https://gitlab.isc.org/isc-projects/bind9/-/blob/v9.20.23/lib/dns/keymgr.c#L1143"><code>lib/dns/keymgr.c</code> lines 1143 and 1159–1164</a>. The same-algorithm test is the last argument, <code>match_algorithms</code>, applied at <a href="https://gitlab.isc.org/isc-projects/bind9/-/blob/v9.20.23/lib/dns/keymgr.c#L823-827">lines 823–827</a>.</p>
+<pre><code>/* lib/dns/keymgr.c:1142-1143, 1159-1164 — keymgr_have_rrsig() */
+/* DNSKEY,     ZRRSIG,      KRRSIG, DS */
+{ OMNIPRESENT, OMNIPRESENT, NA,     NA }, /* (3f) */
+
+/*
+ * Equation (3f):
+ * There is a key with the same algorithm with its DNSKEY and
+ * ZRRSIG records in OMNIPRESENT state.
+ */
+keymgr_key_exists_with_state(keyring, key, type, next_state,
+                             states[0], na, false, true);</code></pre>
+<ul><li><strong>Length change (same alg):</strong> the new ZSK satisfies (3f) for the old ZSK, so the old ZRRSIG may go <code>UNRETENTIVE</code>.</li><li><strong>Algorithm change:</strong> the new ZSK is a different algorithm, so (3f) does not match. The old ZRRSIG stays <code>OMNIPRESENT</code>, and the old DNSKEY stays while those RRSIGs are still required.</li></ul>
+<h3 id="deleting-signatures-after-dnskey-removal">Deleting signatures after DNSKEY removal</h3>
+<p>When the old DNSKEY is removed from the zone, signing walks the zone with <strong>delete</strong> for that key. Incremental quanta (<code>sig-signing-nodes</code> / <code>sig-signing-signatures</code>) mean the delete pass — like the mid-sign report — is <strong>not atomic</strong>. The BITW secondary can serve a zone where some names still show the old keytag and the DNSKEY RRset no longer includes it.</p>
+<h2 id="contrast-diagram">Contrast diagram</h2>
+<pre><code> SAME ALGORITHM, NEW LENGTH                         ALGORITHM CHANGE
+ -------------------                                -----------------
+
+  ZSK_old (alg 8, 1024)                             ZSK_old (alg 8)
+  ZSK_new (alg 8, 2048)                             ZSK_new (alg 13)
+
+       |                                                 |
+       |  (3f): same alg? YES                            |  (3f): same alg? NO
+       v                                                 v
+  old ZRRSIG → UNRETENTIVE                         old ZRRSIG stays OMNIPRESENT
+  after new ZRRSIG OMNIPRESENT                     ((3f) is same-algorithm only)
+       |                                                 |
+       v                                                 v
+  old DNSKEY removed                                old DNSKEY retained
+  while re-sign incomplete                          until safe multi-alg transition
+       |                                                 |
+       v                                                 v
+  orphan RRSIG / BOGUS                              validators still find DNSKEY</code></pre>
+<p>Lifetimeating resolvers do not care that both keys are “algorithm 8” if the <strong>keytag</strong> in the RRSIG is gone from DNSKEY. Algorithm rollover’s dual-algorithm period is a different (and better understood) dance; the length-only trap is easy to miss because the ARM describes smooth <strong>lifetime</strong> rollovers and <strong>algorithm</strong> rollovers — not “replace key length by switching policy name.”</p>
+<h2 id="timing-model-incident-vs-lab">Timing model (incident vs lab)</h2>
+<table><thead><tr>
+<th>Knob</th>
+<th>Incident (approx.)</th>
+<th>Lab short-timer policies</th>
+</tr></thead><tbody>
+<tr>
+<td>Longest real TTL</td>
+<td><strong>24 h</strong></td>
+<td>zone <code>$TTL 300</code></td>
+</tr>
+<tr>
+<td><code>max-zone-ttl</code></td>
+<td><strong>P2D</strong> (drives timers)</td>
+<td><strong>15s</strong> (opens the unlinked window before a large-zone re-sign finishes)</td>
+</tr>
+<tr>
+<td><code>dnskey-ttl</code> / safety</td>
+<td>hours</td>
+<td>5s / 0</td>
+</tr>
+<tr>
+<td>Linked <code>Dsgn</code></td>
+<td>~days if predecessor existed</td>
+<td>~45 m if predecessor existed</td>
+</tr>
+<tr>
+<td>Observed to old-ZSK removal</td>
+<td><strong>~48 h</strong></td>
+<td>order of <strong>minutes</strong> after switch</td>
+</tr>
+</tbody></table>
+<p>Important: operators who assume “timers follow the longest TTL in the zone (24 h)” will under-estimate wait if <code>max-zone-ttl</code> is larger (P2D). Conversely, setting <code>max-zone-ttl</code> high “for safety” <strong>extends</strong> the unlinked omnipresent wait — but still <strong>without</strong> guaranteeing a full re-sign, because <code>Dsgn</code> was skipped.</p>
+<h2 id="safeguards-operational">Safeguards (operational)</h2>
+<ol><li><strong>Do not change ZSK/KSK length by swapping policy names</strong> on a live signed zone. Prefer a planned lifetime rollover, or introduce the new length as an <strong>additional</strong> key in <code>keys { ... }</code> and remove the old only after coverage.</li><li><strong><code>manual-mode yes;</code></strong> during policy surgery; step with <code>rndc dnssec -step</code> only when coverage is verified.</li><li>Temporarily <strong>raise</strong> <code>max-zone-ttl</code> / add explicit wait until every signable RRset carries the <strong>new</strong> keytag (AXFR oracle), before allowing old DNSKEY removal — understanding that unlinked keys still skip <code>Dsgn</code>.</li><li>For algorithm changes, follow a multi-algorithm transition; do not treat them as interchangeable with length changes.</li><li>On BITW, remember mid-sign <strong>PARTLY_SIGNED</strong> publication (see <a href="REPORT.md">REPORT.md</a>) can compound key-transition damage for <code>DO=1</code> clients.</li></ol>
+<h2 id="lab-reproduction">Lab reproduction</h2>
+<h3 id="bind-bind-bind-reproduce-the-orphan-hazard">BIND-BIND-BIND — reproduce the orphan hazard</h3>
+<pre><code>cd BIND-BIND-BIND
+# Prefer ZONESIZE≥10 so re-sign outlasts the unlinked max-zone-ttl window.
+# Same algorithm, 1024 → 2048 (expect FAIL = orphan RRSIG hazard)
+ZONESIZE=10 ROLLOVER=size ./scripts/scenario-key-policy-change.sh
+
+# Algorithm 8 → 13 (expect PASS = no orphan while old DNSKEY retained)
+ZONESIZE=10 ROLLOVER=alg ./scripts/scenario-key-policy-change.sh</code></pre>
+<p>Oracle: <code>COMMON/scripts/check-orphan-rrsig.py</code> — RRSIGs whose keytag is not present in the apex DNSKEY RRset.</p>
+<h3 id="bind-bind-knot-knot-gate-after-the-same-length-switch-nsec3">BIND-BIND-KNOT — Knot gate after the same length switch (NSEC3)</h3>
+<p>Same 1024→2048 policy-name switch on a large NSEC3 zone with short-timer policies <code>repro-nsec3-rsa1024</code> / <code>repro-nsec3-rsa2048</code>, Knot distribution <code>dnssec-validation: on</code>.</p>
+<p><strong>PASS</strong> if distribution never serves an invalid zone (<code>UNSIGNED</code> / <code>PARTLY_SIGNED</code> / orphan RRSIG), including when AXFR is unavailable. <strong>FAIL</strong> if Knot ever answers with invalid content.</p>
+<pre><code>cd BIND-BIND-KNOT
+ZONESIZE=10 MODE=nsec3 ./scripts/scenario-key-policy-gate.sh</code></pre>
+<p>Standalone (not in <code>./run-all.sh</code>). Signer-side orphan checks are diagnostic only.</p>
+<h2 id="relation-to-the-mid-sign-report">Relation to the mid-sign report</h2>
+<table><thead><tr>
+<th>Report</th>
+<th>Failure mode</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="REPORT.md">REPORT.md</a></td>
+<td>BIND commits/notifies <strong>during</strong> <code>zone_sign</code> quanta → <code>PARTLY_SIGNED</code> AXFR</td>
+</tr>
+<tr>
+<td>This report</td>
+<td>Key <strong>state machine</strong> removes DNSKEY / deletes RRSIGs <strong>before</strong> full re-sign after an unlinked length change</td>
+</tr>
+</tbody></table>
+<p>Both break validating end users; they are independent bugs/hazards in the same BITW posture.</p>
+
+<footer>
+  Repository: <a href="https://github.com/davidgroves/signing-lab">github.com/davidgroves/signing-lab</a> ·
+  Source: <a href="REPORT-KEY-POLICY.md">REPORT-KEY-POLICY.md</a> ·
+  Battery matrix: <a href="RESULTS.html">RESULTS.html</a>
+  · Related: <a href="REPORT.html">mid-sign transfers</a> · <a href="REPORT-KEY-POLICY.html">key length / algorithm</a> · <a href="REPORT-ZSK-WITHDRAW.html">ZSK withdraw / Knot gate</a> ·
+  Regenerate with <code>python3 COMMON/scripts/make-report-html.py</code>
+</footer>
+</div>
+</body>
+</html>

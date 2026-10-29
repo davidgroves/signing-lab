@@ -1,0 +1,77 @@
+name: bkms-manualsigning
+
+x-bind-common: &bind-common
+  image: internetsystemsconsortium/bind9:${BIND_TAG:-9.20}
+  entrypoint: ["/bin/sh", "/entrypoint/named-entrypoint.sh"]
+  environment:
+    - TZ=UTC
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "rndc status >/dev/null 2>&1"]
+    interval: 5s
+    timeout: 5s
+    retries: 12
+    start_period: 15s
+
+x-knot-common: &knot-common
+  image: cznic/knot:${KNOT_TAG:-latest}
+  command: ["knotd", "-c", "/config/knot.conf", "-v"]
+  environment:
+    - TZ=UTC
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "knotc status >/dev/null 2>&1"]
+    interval: 5s
+    timeout: 5s
+    retries: 12
+    start_period: 20s
+
+services:
+  primary:
+    <<: *bind-common
+    container_name: bkms-primary
+    hostname: primary
+    networks:
+      dnsnet:
+        ipv4_address: 172.30.57.10
+    ports:
+      - "${PRIMARY_PORT:-55353}:53/udp"
+      - "${PRIMARY_PORT:-55353}:53/tcp"
+    volumes:
+      - ./scripts/named-entrypoint.sh:/entrypoint/named-entrypoint.sh:ro
+      - ./config/primary/named.conf:/etc/bind/named.conf:ro
+      - ./config/common/rndc.key:/etc/bind/rndc.key:ro
+      - ./config/common/rndc.conf:/etc/bind/rndc.conf:ro
+      # RW: scenario edits the signed zonefile in place, then rndc reload.
+      - ./zones:/var/lib/bind/zones
+      - primary-cache:/var/cache/bind
+      - primary-log:/var/log
+
+  distribution:
+    <<: *knot-common
+    container_name: bkms-distribution
+    hostname: distribution
+    depends_on:
+      primary:
+        condition: service_healthy
+    networks:
+      dnsnet:
+        ipv4_address: 172.30.57.30
+    ports:
+      - "${DISTRIBUTION_PORT:-55355}:53/udp"
+      - "${DISTRIBUTION_PORT:-55355}:53/tcp"
+    volumes:
+      - ./config/distribution/knot.conf:/config/knot.conf:ro
+      - ./storage/distribution:/storage
+      - ./rundir/distribution:/rundir
+
+networks:
+  dnsnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.57.0/24
+
+volumes:
+  primary-cache:
+  primary-log:

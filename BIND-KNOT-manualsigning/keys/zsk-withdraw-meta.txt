@@ -1,0 +1,8 @@
+zone=manual.test.example
+ksk_base=Kmanual.test.example.+013+11002
+zsk_base=Kmanual.test.example.+013+25579
+zsk_flags=256
+zsk_proto=3
+zsk_alg=13
+zsk_keymaterial=zqvf+RwmMoqzD6plZRqSZimAlG4l7LVxKiugT/NWlmpfQcUAM6Yx74/p5dqJnDYZkBO5pHF/zYHiTI/i0ISVSQ==
+signed_file=/home/dwg/CODE/signing-lab/BIND-KNOT-manualsigning/zones/db.manual.test.example.signed

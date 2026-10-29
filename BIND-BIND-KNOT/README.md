@@ -28,4 +28,14 @@ ZONESIZE=10 ./run-all.sh
 
 Configs: `config/distribution/knot.validate-off.conf` / `knot.validate-on.conf`.
 
-Shared oracle/generator: [`../COMMON/`](../COMMON/). Analysis: [`../REPORT.md`](../REPORT.md).
+### Key-policy gate (standalone)
+
+RSA1024 → RSA2048 same-algorithm policy-name switch on a large NSEC3 zone with short timers; asserts Knot `dnssec-validation: on` never serves an invalid zone (orphan RRSIG / `PARTLY_SIGNED` / `UNSIGNED`). See [`../REPORT-KEY-POLICY.md`](../REPORT-KEY-POLICY.md).
+
+```bash
+ZONESIZE=10 MODE=nsec3 ./scripts/scenario-key-policy-gate.sh
+```
+
+PASS = every successful distribution AXFR is clean, or AXFR unavailable. FAIL = distribution served invalid content. Not part of `./run-all.sh`.
+
+Shared oracle/generator: [`../COMMON/`](../COMMON/). Analysis: [`../REPORT.md`](../REPORT.md), [`../REPORT-KEY-POLICY.md`](../REPORT-KEY-POLICY.md).
